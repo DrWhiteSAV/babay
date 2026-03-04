@@ -1,0 +1,345 @@
+import { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { usePlayerStore } from "../store/playerStore";
+import { motion } from "motion/react";
+import { User, ArrowLeft, Copy, Share2, Trophy, Camera, BookOpen, Loader2, Image as ImageIcon, Volume2, VolumeX, X, ShieldAlert } from "lucide-react";
+import * as htmlToImage from 'html-to-image';
+import { generateLore } from "../services/geminiService";
+import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
+import Header from "../components/Header";
+import { transliterate } from "../utils/transliterate";
+
+export default function Profile() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { character, fear, energy, watermelons, inventory, updateCharacter, gallery, addToGallery, settings, updateSettings, globalBackgroundUrl, pageBackgrounds, shopItems, bossItems } = usePlayerStore();
+      const profileRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingLore, setIsGeneratingLore] = useState(false);
+  const [infoModal, setInfoModal] = useState<CurrencyType>(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  useEffect(() => {
+    if (character && !character.lore && !isGeneratingLore) {
+      generateCharacterLore();
+    }
+  }, [character]);
+
+  // Ensure avatar is in gallery
+  useEffect(() => {
+    if (character?.avatarUrl && !gallery.includes(character.avatarUrl)) {
+      addToGallery(character.avatarUrl);
+    }
+  }, [character?.avatarUrl]);
+
+  if (!character) {
+    navigate("/");
+    return null;
+  }
+
+  const generateCharacterLore = async () => {
+    setIsGeneratingLore(true);
+    const lore = await generateLore(character.name, character.gender, character.style);
+    updateCharacter({ lore });
+    setIsGeneratingLore(false);
+  };
+
+  const handleCopyRef = () => {
+    const latinName = transliterate(character.name).replace(/\s+/g, "").toLowerCase();
+    navigator.clipboard.writeText(`https://bab-ai.ru/invite/${latinName}`);
+    alert("Ссылка скопирована!");
+  };
+
+  const takeScreenshot = async () => {
+    if (profileRef.current) {
+      try {
+        const dataUrl = await htmlToImage.toPng(profileRef.current, {
+          backgroundColor: '#0a0a0a',
+          pixelRatio: 2,
+        });
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `babai_${character.name}.png`;
+        link.click();
+      } catch (e) {
+        console.error("Screenshot failed", e);
+        alert("Не удалось сделать скриншот");
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      className="flex-1 flex flex-col bg-transparent text-neutral-200 relative overflow-hidden"
+    >
+            <div className="fog-container">
+        <div className="fog-layer"></div>
+        <div className="fog-layer-2"></div>
+      </div>
+
+      <Header 
+        title={<><User size={20} /> Профиль</>}
+        backUrl="/hub"
+        onInfoClick={(type, e) => setInfoModal(type)}
+        rightContent={
+          <div className="flex gap-4">
+            <div
+              role="button"
+              onClick={() => navigate("/admin")}
+              className="p-2 cursor-pointer hover:bg-neutral-800 rounded-full transition-colors text-red-500"
+              title="Админ-панель"
+              style={{ clipPath: 'none' }}
+            >
+              <ShieldAlert size={20} />
+            </div>
+            <div
+              role="button"
+              onClick={() => updateSettings({ ttsEnabled: !settings.ttsEnabled })}
+              className={`p-2 rounded-full cursor-pointer transition-colors ${settings.ttsEnabled ? 'text-green-500 hover:bg-neutral-800' : 'text-neutral-500 hover:bg-neutral-800'}`}
+              title={settings.ttsEnabled ? "Озвучка включена" : "Озвучка выключена"}
+              style={{ clipPath: 'none' }}
+            >
+              {settings.ttsEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </div>
+            <div
+              role="button"
+              onClick={() => navigate("/gallery")}
+              className="p-2 cursor-pointer hover:bg-neutral-800 rounded-full transition-colors text-neutral-400"
+              title="Галерея"
+              style={{ clipPath: 'none' }}
+            >
+              <ImageIcon size={20} />
+            </div>
+            <div
+              role="button"
+              onClick={takeScreenshot}
+              className="p-2 cursor-pointer hover:bg-neutral-800 rounded-full transition-colors text-red-500"
+              title="Сделать скриншот"
+              style={{ clipPath: 'none' }}
+            >
+              <Camera size={20} />
+            </div>
+          </div>
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-8" ref={profileRef}>
+        {/* Avatar & Info */}
+        <section className="flex flex-col items-center text-center">
+          <div className="w-32 h-32 rounded-full border-4 border-red-900/50 overflow-hidden shadow-[0_0_30px_rgba(220,38,38,0.2)] bg-neutral-900 mb-4 relative">
+            <img
+              src={character.avatarUrl}
+              alt={character.name}
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+            />
+          </div>
+          <h2
+            className="text-3xl font-black text-white uppercase tracking-wider"
+            style={{ fontFamily: "'Playfair Display', serif" }}
+          >
+            {character.name}
+          </h2>
+          <p className="text-red-500 text-sm mt-1 uppercase tracking-widest">
+            {character.gender} • {character.style}
+          </p>
+          <div className="flex gap-2 mt-4 flex-wrap justify-center">
+            {character.wishes.map((w, i) => (
+              <span
+                key={i}
+                className="px-3 py-1 bg-neutral-900 border border-neutral-800 rounded-full text-xs text-neutral-400"
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        {/* Stats */}
+        <section className="grid grid-cols-3 gap-4">
+          <div 
+            className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-neutral-600 transition-colors"
+            onClick={() => setInfoModal('fear')}
+          >
+            <span className="text-3xl font-black text-white">{fear}</span>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
+              Страх
+            </span>
+          </div>
+          <div 
+            className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-neutral-600 transition-colors"
+            onClick={() => setInfoModal('energy')}
+          >
+            <span className="text-3xl font-black text-white">{energy}</span>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
+              Энергия
+            </span>
+          </div>
+          <div 
+            className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-neutral-600 transition-colors"
+            onClick={() => setInfoModal('watermelons')}
+          >
+            <span className="text-3xl font-black text-white">{watermelons}</span>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
+              Арбузы
+            </span>
+          </div>
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center justify-center col-span-3">
+            <span className="text-3xl font-black text-white">
+              {character.telekinesisLevel}
+            </span>
+            <span className="text-xs text-neutral-500 uppercase tracking-widest mt-1">
+              Уровень Телекинеза
+            </span>
+          </div>
+        </section>
+
+        {/* Gallery Preview */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+          <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2"><ImageIcon size={18} /> Галерея</span>
+            <button 
+              onClick={() => navigate("/gallery")}
+              className="text-xs text-red-500 font-bold hover:underline"
+            >
+              СМОТРЕТЬ ВСЕ
+            </button>
+          </h3>
+          <div className="grid grid-cols-4 gap-2">
+            {gallery.slice(0, 4).map((img, i) => (
+              <div 
+                key={i} 
+                className="aspect-square rounded-lg overflow-hidden border border-neutral-800 cursor-pointer"
+                onClick={() => navigate("/gallery")}
+              >
+                <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
+              </div>
+            ))}
+            {gallery.length < 4 && Array.from({ length: 4 - gallery.length }).map((_, i) => (
+              <div key={i} className="aspect-square rounded-lg bg-neutral-950 border border-neutral-800 border-dashed flex items-center justify-center text-neutral-800">
+                <ImageIcon size={16} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Lore */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+          <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2"><BookOpen size={18} /> История духа</span>
+            {isGeneratingLore && <Loader2 size={16} className="animate-spin text-red-500" />}
+          </h3>
+          <div className="text-sm text-neutral-400 leading-relaxed font-serif italic space-y-3">
+            {character.lore ? (
+              character.lore.split('\n').map((paragraph, i) => (
+                paragraph.trim() && <p key={i}>{paragraph}</p>
+              ))
+            ) : isGeneratingLore ? (
+              <p className="animate-pulse">Дух вспоминает свое прошлое...</p>
+            ) : (
+              <p>История утеряна во мраке веков.</p>
+            )}
+          </div>
+        </section>
+
+        {/* Inventory */}
+        <section>
+          <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-2">
+            <Trophy size={18} /> Инвентарь ({inventory.length}/{shopItems.length + bossItems.length})
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {[...shopItems, ...bossItems].map((item, i) => {
+              const isOwned = inventory.includes(item.id);
+              return (
+                <motion.div
+                  layout
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  key={i}
+                  onClick={(e) => setSelectedItem({item, y: e.clientY})}
+                  className={`border rounded-xl p-3 flex flex-col items-center text-center gap-2 transition-colors cursor-pointer ${isOwned ? 'bg-neutral-900 border-neutral-600 hover:border-red-500' : 'bg-neutral-950 border-neutral-800 opacity-50 hover:opacity-80'}`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${isOwned ? 'bg-neutral-800' : 'bg-neutral-900 grayscale'}`}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h4 className={`font-bold text-xs line-clamp-1 ${isOwned ? 'text-white' : 'text-neutral-500'}`}>{item.name}</h4>
+                    <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{item.type}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Referral */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+          <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wider flex items-center gap-2">
+            <Share2 size={18} /> Пригласи друга
+          </h3>
+          <p className="text-xs text-neutral-400 mb-4">
+            Получи 100 энергии и 100 страха за каждого друга, который
+            присоединится по твоей ссылке.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-3 text-sm text-neutral-500 truncate">
+              bab-ai.ru/invite/
+              {transliterate(character.name).replace(/\s+/g, "").toLowerCase()}
+            </div>
+            <button
+              onClick={handleCopyRef}
+              className="p-3 bg-red-700 hover:bg-red-600 text-white rounded-xl transition-colors flex items-center justify-center"
+            >
+              <Copy size={18} />
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <CurrencyModal type={infoModal} onClose={() => setInfoModal(null)} />
+
+      {/* Item Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedItem(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "-50%" }}
+            animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+            exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-50%" }}
+            onClick={(e) => e.stopPropagation()}
+            className="fixed bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-sm w-[90%] shadow-2xl"
+            style={{ 
+              top: selectedItem.y ? Math.max(200, Math.min(selectedItem.y, window.innerHeight - 200)) : '50%', 
+              left: '50%' 
+            }}
+          >
+            <button
+              onClick={() => setSelectedItem(null)}
+              className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-white bg-neutral-800 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex flex-col items-center text-center mt-4">
+              <div className="w-24 h-24 rounded-3xl bg-neutral-800 flex items-center justify-center text-5xl mb-4 shadow-inner">
+                {selectedItem.item.icon}
+              </div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">
+                {selectedItem.item.name}
+              </h3>
+              <p className="text-xs text-neutral-500 uppercase tracking-widest mb-4">
+                {selectedItem.item.type}
+              </p>
+              <p className="text-neutral-300 text-sm leading-relaxed">
+                {selectedItem.item.description}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
