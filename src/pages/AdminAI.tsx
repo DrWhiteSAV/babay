@@ -155,11 +155,18 @@ export default function AdminAI() {
                 <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold flex items-center gap-1"><Bot size={10} /> Модель ИИ</label>
                 <select className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white text-xs focus:border-red-500 outline-none"
                   value={s.service} onChange={e => update(idx, "service", e.target.value)}>
-                  <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                  <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                  <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
-                  <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Image</option>
-                  <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 TTS</option>
+                  <optgroup label="— Текст —">
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (текст, быстрый)</option>
+                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (текст, дешевле)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (текст, умный)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (текст, мощный)</option>
+                  </optgroup>
+                  <optgroup label="— Изображения —">
+                    <option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash Image (генерация картинок) ✅</option>
+                  </optgroup>
+                  <optgroup label="— Аудио / TTS —">
+                    <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS (голос)</option>
+                  </optgroup>
                 </select>
               </div>
               <div className="space-y-1">
