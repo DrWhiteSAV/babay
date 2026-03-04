@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAudio, menuMusic, bgMusics } from "./hooks/useAudio";
 import BottomNav from "./components/BottomNav";
 import { CutscenePlayer } from "./components/CutscenePlayer";
+import { supabase } from "./integrations/supabase/client";
 
 // Pages
 import Home from "./pages/Home";
@@ -40,10 +41,33 @@ import { useTelegram } from "./context/TelegramContext";
 function AppContent() {
   const { entryMode, isLoading } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
-  const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds } = usePlayerStore();
+  const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds, setPageBackground, setVideoCutscenes } = usePlayerStore();
   const { playClick } = useAudio(settings.musicVolume);
   const location = useLocation();
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load page backgrounds and video cutscenes from Supabase on startup
+  useEffect(() => {
+    const loadRemoteData = async () => {
+      const [bgResult, videoResult] = await Promise.all([
+        supabase.from("page_backgrounds").select("page_path, url, dimming"),
+        supabase.from("video_cutscenes").select("orientation, url, sort_order").order("sort_order"),
+      ]);
+
+      if (bgResult.data && bgResult.data.length > 0) {
+        bgResult.data.forEach(row => {
+          setPageBackground(row.page_path, row.url || "", row.dimming ?? 80);
+        });
+      }
+
+      if (videoResult.data && videoResult.data.length > 0) {
+        const vertical = videoResult.data.filter(d => d.orientation === "vertical").map(d => d.url);
+        const horizontal = videoResult.data.filter(d => d.orientation === "horizontal").map(d => d.url);
+        setVideoCutscenes(vertical, horizontal);
+      }
+    };
+    loadRemoteData();
+  }, []);
 
   useEffect(() => {
     const { friends, addFriend, toggleFriendAi } = usePlayerStore.getState();
