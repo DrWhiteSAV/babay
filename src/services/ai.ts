@@ -1,30 +1,6 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { compressImage } from "../utils/imageUtils";
 import { supabase } from "../integrations/supabase/client";
-
-let _ai: GoogleGenAI | null = null;
-
-function getAI(): GoogleGenAI {
-  if (!_ai) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyCUCb8uYbhPOJSqKw4TtZrCkdLyVlDDbiE";
-    _ai = new GoogleGenAI({ apiKey });
-  }
-  return _ai;
-}
-
-// Helper for exponential backoff retry
-async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> {
-  try {
-    return await fn();
-  } catch (e: any) {
-    const isRetryableError = e?.status === 429 || e?.status === 500 || e?.status === 503 || e?.message?.includes("429") || e?.message?.includes("500") || e?.message?.includes("503") || e?.message?.includes("quota") || e?.message?.includes("Internal error");
-    if (isRetryableError && retries > 0) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return withRetry(fn, retries - 1, delay * 2);
-    }
-    throw e;
-  }
-}
+import { protalkGenerateText, protalkGenerateImage } from "./protalk";
 
 // Load AI settings for a section from Supabase
 async function loadAISettings(sectionId: string): Promise<{ service: string; prompt: string } | null> {
@@ -45,43 +21,28 @@ function applyMacros(prompt: string, data: Record<string, string>): string {
   return prompt.replace(/\{(\w+)\}/g, (_, key) => data[key] ?? `{${key}}`);
 }
 
-export async function generateSpookyVoice(text: string): Promise<string> {
+// Get telegram ID from player store if available
+function getTelegramId(): number | undefined {
   try {
-    const response = await withRetry(() => getAI().models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Произнеси жутким, пугающим голосом: ${text}` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Charon" },
-          },
-        },
-      },
-    }));
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return base64Audio ? `data:audio/mp3;base64,${base64Audio}` : "";
-  } catch (e: any) {
-    console.warn("TTS Error or Rate limit, falling back to browser TTS.");
-    return "";
+    const tg = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id;
+    return tg ? Number(tg) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
-export async function generateCharacterName(
-  gender: string,
-  style: string,
-): Promise<string> {
+export async function generateSpookyVoice(_text: string): Promise<string> {
+  // TTS not supported in ProTalk — return empty to fall back to browser TTS
+  return "";
+}
+
+export async function generateCharacterName(gender: string, style: string): Promise<string> {
   try {
     const settings = await loadAISettings("names");
-    const model = settings?.service || "gemini-2.0-flash";
     const basePrompt = settings?.prompt || "Сгенерируй уникальное, забавное имя для славянского кибернетического духа. Пол: {gender}. Стиль: {style}. Имя должно состоять из одного или двух слов. Верни только имя, без лишних слов.";
     const prompt = applyMacros(basePrompt, { gender, style });
-
-    const response = await withRetry(() => getAI().models.generateContent({
-      model,
-      contents: prompt,
-    }));
-    return response.text?.trim() || "Безымянный";
+    const result = await protalkGenerateText(prompt, getTelegramId());
+    return result.trim() || "Безымянный";
   } catch (e) {
     console.error("Name gen error:", e);
     const names = ["Бабай", "Бука", "Жмых", "Кибер-Леший", "Яга-Бот", "Скрежет"];
@@ -93,10 +54,12 @@ export async function generateAvatar(
   gender: string,
   style: string,
   wishes: string[],
-  extraData?: Record<string, string>
+  extraData?: Record<string, string>,
 ): Promise<{ url: string; prompt: string }> {
   const settings = await loadAISettings("avatar");
-  const basePrompt = settings?.prompt || "A portrait of a Slavic cybernetic spirit named {gender}. They wear pajamas and have a spooky but funny appearance with a long tongue. Style: {style}. Additional wishes: {wishes}. High quality, detailed, atmospheric, slightly comical.";
+  const basePrompt =
+    settings?.prompt ||
+    "Нарисуй портрет славянского кибернетического духа по имени {name} ({gender}). Наряд: пижама. Внешность: страшная и смешная, длинный язык больше метра. Стиль: {style}. Дополнительно: {wishes}. Высокое качество, детализированный, атмосферный.";
   const prompt = applyMacros(basePrompt, {
     gender,
     style,
@@ -106,21 +69,9 @@ export async function generateAvatar(
   });
 
   try {
-    const model = settings?.service || "gemini-2.0-flash-preview-image-generation";
-    const response = await withRetry(() => getAI().models.generateContent({
-      model,
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        responseModalities: ["IMAGE", "TEXT"],
-      },
-    }));
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const base64 = `data:image/png;base64,${part.inlineData.data}`;
-        const url = await compressImage(base64, 512, 512);
-        return { url, prompt };
-      }
+    const { url, prompt: usedPrompt } = await protalkGenerateImage(prompt, getTelegramId());
+    if (url && url.startsWith("http")) {
+      return { url, prompt: usedPrompt };
     }
     return { url: "https://i.ibb.co/BVgY7XrT/babai.png", prompt };
   } catch (e) {
@@ -135,33 +86,20 @@ export async function generateScenario(
   style: string,
 ): Promise<{ text: string; options: string[]; correctAnswer: number; successText: string; failureText: string }> {
   try {
-    const response = await withRetry(() => getAI().models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `Ты - ведущий текстовой ролевой игры "Бабай". Игрок - славянский кибер-дух (старик/старуха в пижаме с длинным языком и телекинезом).
-      Цель: выгнать жильцов из многоквартирного дома.
-      Стиль игры: ${style}. Этап: ${stage}. Сложность: ${difficulty}.
-      
-      Опиши текущую ситуацию (коротко, 2-3 предложения), где Бабай пугает очередного жильца (или группу).
-      Затем предложи 3 варианта действий для игрока. Только один вариант должен быть правильным (успешным) для выселения, остальные ведут к провалу.
-      Также напиши текст результата: что произошло при успехе (successText) и что произошло при провале (failureText).`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            text: { type: Type.STRING, description: "Описание ситуации" },
-            options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 варианта действий" },
-            correctAnswer: { type: Type.INTEGER, description: "Индекс правильного варианта (0, 1 или 2)" },
-            successText: { type: Type.STRING, description: "Текст при правильном выборе" },
-            failureText: { type: Type.STRING, description: "Текст при неправильном выборе" }
-          },
-          required: ["text", "options", "correctAnswer", "successText", "failureText"]
-        }
-      },
-    }));
+    const prompt = `Ты - ведущий текстовой ролевой игры "Бабай". Игрок - славянский кибер-дух (старик/старуха в пижаме с длинным языком и телекинезом).
+Цель: выгнать жильцов из многоквартирного дома. Стиль игры: ${style}. Этап: ${stage}. Сложность: ${difficulty}.
 
-    const text = response.text?.trim() || "{}";
-    return JSON.parse(text);
+Опиши текущую ситуацию (коротко, 2-3 предложения), где Бабай пугает очередного жильца.
+Предложи 3 варианта действий для игрока. Только один правильный.
+Также напиши результат при успехе (successText) и провале (failureText).
+
+Ответь строго в формате JSON:
+{"text":"...","options":["...","...","..."],"correctAnswer":0,"successText":"...","failureText":"..."}`;
+
+    const result = await protalkGenerateText(prompt, getTelegramId());
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    throw new Error("No JSON in response");
   } catch (e) {
     console.error("Scenario gen error:", e);
     const fallbacks = [
@@ -169,16 +107,16 @@ export async function generateScenario(
         text: `Этаж ${stage}. Жилец заперся в ванной и поет песни. Что будешь делать?`,
         options: ["Просунуть длинный язык под дверь", "Использовать телекинез на кран", "Громко завыть"],
         correctAnswer: 1,
-        successText: "Вода внезапно стала ледяной, а потом закипела! Жилец выскочил из ванной в ужасе.",
-        failureText: "Жилец просто начал петь громче, игнорируя твои попытки."
+        successText: "Вода внезапно стала ледяной! Жилец выскочил из ванной в ужасе.",
+        failureText: "Жилец просто начал петь громче, игнорируя твои попытки.",
       },
       {
         text: `Этаж ${stage}. Группа подростков вызывает духов в подъезде.`,
         options: ["Явиться им в пижаме", "Выключить свет во всем доме", "Начать левитировать их телефоны"],
         correctAnswer: 2,
-        successText: "Телефоны взмыли в воздух и начали транслировать помехи. Подростки разбежались, роняя кепки.",
-        failureText: "Они приняли тебя за косплеера и начали делать селфи. Какой позор."
-      }
+        successText: "Телефоны взмыли в воздух! Подростки разбежались, роняя кепки.",
+        failureText: "Они приняли тебя за косплеера и начали делать селфи. Какой позор.",
+      },
     ];
     return fallbacks[stage % fallbacks.length];
   }
@@ -187,49 +125,30 @@ export async function generateScenario(
 export async function generateBackgroundImage(
   stage: number,
   style: string,
-  characterData?: Record<string, string>
+  characterData?: Record<string, string>,
 ): Promise<{ url: string; prompt: string }> {
   const settings = await loadAISettings("background");
-  const basePrompt = settings?.prompt || "A beautiful, atmospheric background image for a video game. It shows an empty hallway or room in a futuristic apartment building. The style is {style}. Stage {stage}. No text, no people, just the environment, highly detailed.";
+  const basePrompt =
+    settings?.prompt ||
+    "Нарисуй атмосферный фон для игры ужасов: тёмный заброшенный дом, ночь, туман. Стиль: {style}. Без людей, без текста.";
   const prompt = applyMacros(basePrompt, {
     style,
     stage: String(stage),
     name: characterData?.name || "",
     gender: characterData?.gender || "",
     fear: characterData?.fear || "",
-    energy: characterData?.energy || "",
-    watermelons: characterData?.watermelons || "",
     telekinesis: characterData?.telekinesis || "",
     boss_level: characterData?.boss_level || "",
-    lore: characterData?.lore || "",
-    wishes: characterData?.wishes || "",
-    inventory: characterData?.inventory || "",
-    username: characterData?.username || "",
-    first_name: characterData?.first_name || "",
-    telegram_id: characterData?.telegram_id || "",
+    watermelons: characterData?.watermelons || "",
     ...characterData,
   });
 
   try {
-    const model = settings?.service || "gemini-2.0-flash-preview-image-generation";
-    const response = await withRetry(() => getAI().models.generateContent({
-      model,
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        responseModalities: ["IMAGE", "TEXT"],
-      },
-    }));
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const base64 = `data:image/png;base64,${part.inlineData.data}`;
-        const url = await compressImage(base64, 1280, 720);
-        return { url, prompt };
-      }
-    }
+    const { url, prompt: usedPrompt } = await protalkGenerateImage(prompt, getTelegramId());
+    if (url && url.startsWith("http")) return { url, prompt: usedPrompt };
     return { url: "https://picsum.photos/id/1015/1920/1080", prompt };
   } catch (e) {
-    console.error("Background image gen error:", e);
+    console.error("Background gen error:", e);
     return { url: "https://picsum.photos/id/1015/1920/1080", prompt };
   }
 }
@@ -237,40 +156,25 @@ export async function generateBackgroundImage(
 export async function generateBossImage(
   stage: number,
   style: string,
-  characterData?: Record<string, string>
+  characterData?: Record<string, string>,
 ): Promise<{ url: string; prompt: string }> {
   const settings = await loadAISettings("boss");
-  const basePrompt = settings?.prompt || "A massive boss character for a Slavic cyberpunk game. It is a corrupted version of a building manager or a giant mechanical spider-like spirit. Style: {style}. Boss stage: {stage}. Epic, detailed, high quality.";
+  const basePrompt =
+    settings?.prompt ||
+    "Нарисуй огромного, ужасающего босса для славянской игры ужасов. Стиль: {style}. Уровень босса: {boss_level}. Эпичный, детализированный.";
   const prompt = applyMacros(basePrompt, {
     style,
     stage: String(stage),
-    name: characterData?.name || "",
-    gender: characterData?.gender || "",
     boss_level: characterData?.boss_level || String(stage),
-    fear: characterData?.fear || "",
     ...characterData,
   });
 
   try {
-    const model = settings?.service || "gemini-2.0-flash-preview-image-generation";
-    const response = await withRetry(() => getAI().models.generateContent({
-      model,
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        responseModalities: ["IMAGE", "TEXT"],
-      },
-    }));
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const base64 = `data:image/png;base64,${part.inlineData.data}`;
-        const url = await compressImage(base64, 512, 512);
-        return { url, prompt };
-      }
-    }
+    const { url, prompt: usedPrompt } = await protalkGenerateImage(prompt, getTelegramId());
+    if (url && url.startsWith("http")) return { url, prompt: usedPrompt };
     return { url: "https://picsum.photos/id/718/1920/1080", prompt };
   } catch (e) {
-    console.error("Boss image gen error:", e);
+    console.error("Boss gen error:", e);
     return { url: "https://picsum.photos/id/718/1920/1080", prompt };
   }
 }
@@ -280,49 +184,31 @@ export async function generateFriendChat(
   friendName: string,
   character: any,
   style: string,
-  chatHistory: { sender: string, text: string }[] = [],
-  imageUrl?: string
+  chatHistory: { sender: string; text: string }[] = [],
+  imageUrl?: string,
 ): Promise<string> {
   try {
-    const parts: any[] = [];
-    if (imageUrl) {
-      const base64Data = imageUrl.split(',')[1];
-      const mimeType = imageUrl.split(';')[0].split(':')[1];
-      parts.push({
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType,
-        }
-      });
-    }
-    
     let historyText = "";
     if (chatHistory.length > 0) {
-      historyText = `\nИстория последних сообщений:\n` + chatHistory.map(m => `${m.sender === 'user' ? (character?.name || 'Бабай') : m.sender}: ${m.text}`).join('\n') + `\n`;
+      historyText =
+        "\nИстория последних сообщений:\n" +
+        chatHistory.map((m) => `${m.sender === "user" ? character?.name || "Бабай" : m.sender}: ${m.text}`).join("\n") +
+        "\n";
     }
 
     let promptText = "";
     if (friendName === "ДанИИл") {
       const settings = await loadAISettings("chat");
-      const basePrompt = settings?.prompt || "Ты ДанИИл, дух-начальник (ИИ), который контролирует Бабаев. Стиль общения: строгий, саркастичный, требует отчетов о выселении жильцов.";
-      promptText = `${basePrompt} Учитывай стиль мира: ${style}. Игрок (Бабай по имени ${character?.name || 'Неизвестный'}) пишет тебе: "${message}".${historyText}${imageUrl ? "Игрок также прислал изображение. Прокомментируй его, если оно относится к делу." : ""} Ответь коротко (1-2 предложения), оцени работу и дай добро на следующий этап, если игрок убедителен.`;
+      const basePrompt =
+        settings?.prompt ||
+        "Ты ДанИИл, дух-начальник (ИИ), который контролирует Бабаев. Стиль: строгий, саркастичный, требует отчетов о выселении жильцов.";
+      promptText = `${basePrompt} Стиль мира: ${style}. Бабай по имени ${character?.name || "Неизвестный"} пишет тебе: "${message}".${historyText}${imageUrl ? " Игрок также прислал изображение, прокомментируй." : ""} Ответь коротко (1-2 предложения).`;
     } else {
-      promptText = `Ты - ИИ-заместитель друга по имени ${friendName}. 
-      Твой собеседник - Бабай по имени ${character?.name || 'Неизвестный'} (описание: ${character?.description || 'нет описания'}).
-      Стиль мира: ${style}.
-      Веди себя как другой Бабай-коллега, который тоже пугает людей, но сейчас общается в чате.
-      Игрок пишет тебе: "${message}".${historyText}
-      ${imageUrl ? "Игрок также прислал изображение. Прокомментируй его." : ""}
-      Ответь коротко (1-3 предложения), поддерживая атмосферу мира Бабаев и характер собеседника.`;
+      promptText = `Ты - ИИ-заместитель друга по имени ${friendName}. Твой собеседник - Бабай по имени ${character?.name || "Неизвестный"}. Стиль мира: ${style}. Веди себя как другой Бабай-коллега. Игрок пишет: "${message}".${historyText} Ответь коротко (1-3 предложения).`;
     }
 
-    parts.push({ text: promptText });
-
-    const response = await withRetry(() => getAI().models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: { parts },
-    }));
-    return response.text?.trim() || "Продолжай работать.";
+    const result = await protalkGenerateText(promptText, getTelegramId());
+    return result.trim() || "Продолжай работать.";
   } catch (e) {
     console.error("Friend chat error:", e);
     if (friendName === "ДанИИл") {
@@ -330,12 +216,11 @@ export async function generateFriendChat(
         "Слишком много разговоров, Бабай. Иди работай.",
         "Твои отчеты полны ошибок. Исправь это на следующем этаже.",
         "Я слежу за тобой. Не разочаруй систему.",
-        "Энергия не бесконечна. Поторопись с выселением."
+        "Энергия не бесконечна. Поторопись с выселением.",
       ];
       return replies[Math.floor(Math.random() * replies.length)];
-    } else {
-      return "Связь прервалась. Попробуй позже.";
     }
+    return "Связь прервалась. Попробуй позже.";
   }
 }
 
@@ -343,19 +228,16 @@ export async function generateLore(
   name: string,
   gender: string,
   style: string,
-  extraData?: Record<string, string>
+  extraData?: Record<string, string>,
 ): Promise<string> {
   try {
     const settings = await loadAISettings("lore");
-    const basePrompt = settings?.prompt || "Напиши короткую (3-4 предложения) мистическую историю происхождения для Бабая по имени {name}, пол: {gender}, стиль: {style}. Сделай историю атмосферной и жуткой.";
+    const basePrompt =
+      settings?.prompt ||
+      "Напиши короткую (3-4 предложения) мистическую историю происхождения для Бабая по имени {name}, пол: {gender}, стиль: {style}. Сделай историю атмосферной и жуткой.";
     const prompt = applyMacros(basePrompt, { name, gender, style, ...extraData });
-    const model = settings?.service || "gemini-2.0-flash";
-
-    const response = await withRetry(() => getAI().models.generateContent({
-      model,
-      contents: prompt,
-    }));
-    return response.text?.trim() || "";
+    const result = await protalkGenerateText(prompt, getTelegramId());
+    return result.trim() || "";
   } catch (e) {
     console.error("Lore gen error:", e);
     return "";
