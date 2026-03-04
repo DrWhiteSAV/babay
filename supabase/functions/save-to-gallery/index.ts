@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, telegramId, label } = await req.json();
+    const { imageUrl, telegramId, label, prompt } = await req.json();
 
     if (!imageUrl || !telegramId) {
       return new Response(JSON.stringify({ error: "imageUrl and telegramId are required" }), {
@@ -89,6 +89,7 @@ serve(async (req) => {
         telegram_id: telegramId,
         image_url: finalUrl,
         label: label || null,
+        prompt: prompt || null,
       })
       .select()
       .single();
