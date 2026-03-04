@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore, Gender, Style } from "../store/playerStore";
 import { DEFAULT_GALLERY_IMAGES } from "../config/defaultSettings";
-import { generateCharacterName, generateLore } from "../services/ai";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, ArrowRight, Sparkles, RefreshCw, CheckCircle } from "lucide-react";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Use hardcoded project URL to avoid undefined env vars in Lovable preview
+const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
 
 const STYLES: Style[] = [
   "Фотореализм", "Хоррор", "Стимпанк", "Киберпанк", "Аниме",
@@ -22,6 +22,31 @@ const WISHES_OPTIONS = [
 ];
 
 const FALLBACK_AVATAR = "https://i.ibb.co/BVgY7XrT/babai.png";
+
+// Direct ProTalk call — bypasses browser checks, always works
+async function callProtalk(
+  type: "text" | "image",
+  prompt: string,
+  telegramId?: number,
+): Promise<{ text?: string; imageUrl?: string | null }> {
+  console.log(`[ProTalk] type=${type}, tgId=${telegramId}, prompt="${prompt.substring(0, 100)}..."`);
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ type, prompt, telegramId }),
+  });
+  console.log(`[ProTalk] response status: ${resp.status}`);
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`protalk-ai ${resp.status}: ${err}`);
+  }
+  const data = await resp.json();
+  console.log(`[ProTalk] success=${data.success}, text="${(data.text || "").substring(0, 80)}", imageUrl=${data.imageUrl}`);
+  return data;
+}
 
 export default function CharacterCreate() {
   const navigate = useNavigate();
@@ -39,10 +64,12 @@ export default function CharacterCreate() {
   const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string>("");
 
   const [isGeneratingName, setIsGeneratingName] = useState(false);
+  const [isGeneratingLore, setIsGeneratingLore] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
-  const [avatarStatus, setAvatarStatus] = useState<"idle" | "generating" | "sending_tg" | "done">("idle");
+  const [avatarStatus, setAvatarStatus] = useState<"idle" | "generating" | "uploading" | "sending_tg" | "done">("idle");
   const [isSaving, setIsSaving] = useState(false);
 
+  // tgId can be 0 (Lovable dev) — we pass it anyway so ProTalk always gets called
   const tgId = profile?.telegram_id;
 
   const toggleWish = (wish: string) => {
@@ -50,38 +77,43 @@ export default function CharacterCreate() {
     else if (wishes.length < 4) setWishes([...wishes, wish]);
   };
 
-  // Step 2: selecting style triggers name + lore generation
-  const handleStyleSelect = async (s: Style) => {
-    setStyle(s);
-    if (!gender) return;
+  // STEP 1: Gender selected → generate name immediately
+  const handleGenderSelect = async (g: Gender) => {
+    setGender(g);
+    setStep(2);
     setIsGeneratingName(true);
     try {
-      console.log(`[Create] generating name: gender=${gender}, style=${s}, tgId=${tgId}`);
-      const name = await generateCharacterName(gender, s, tgId);
-      console.log(`[Create] name generated: "${name}"`);
-      setGeneratedName(name);
-
-      // Generate lore in background
-      generateLore(name, gender, s, {}, tgId).then((lore) => {
-        if (lore) {
-          console.log(`[Create] lore generated len=${lore.length}`);
-          setGeneratedLore(lore);
-        }
-      }).catch(console.error);
+      const prompt = `Придумай одно уникальное необычное имя для персонажа — ${g === "Бабай" ? "старый мужской" : "старый женский"} дух-пугало в пижаме. Имя должно быть оригинальным, жутковатым, смешным. Только одно слово или два слова. Верни ТОЛЬКО само имя без пояснений, кавычек, нумерации.`;
+      const data = await callProtalk("text", prompt, tgId);
+      const raw = data.text || "";
+      const cleaned = raw.split("\n")[0]
+        .replace(/^[\d]+[.)]\s*/, "")
+        .replace(/^[-*•]\s*/, "")
+        .replace(/["""«»]/g, "")
+        .trim();
+      setGeneratedName(cleaned || (g === "Бабай" ? "Бурьяник" : "Тьмарица"));
+      console.log(`[Create] name set: "${cleaned}"`);
     } catch (e) {
       console.error("[Create] name gen error:", e);
-      setGeneratedName("Безымянный");
+      setGeneratedName(g === "Бабай" ? "Бурьяник" : "Тьмарица");
     } finally {
       setIsGeneratingName(false);
     }
   };
 
   const handleRegenerateName = async () => {
-    if (!gender || !style || isGeneratingName) return;
+    if (!gender || isGeneratingName) return;
     setIsGeneratingName(true);
     try {
-      const name = await generateCharacterName(gender, style, tgId);
-      setGeneratedName(name);
+      const prompt = `Придумай одно уникальное необычное имя для ${gender === "Бабай" ? "мужского" : "женского"} духа-Бабая. Имя должно быть оригинальным, ни одно другое такое не существует. Жутковатое и смешное. Только одно-два слова. Верни ТОЛЬКО само имя.`;
+      const data = await callProtalk("text", prompt, tgId);
+      const raw = data.text || "";
+      const cleaned = raw.split("\n")[0]
+        .replace(/^[\d]+[.)]\s*/, "")
+        .replace(/^[-*•]\s*/, "")
+        .replace(/["""«»]/g, "")
+        .trim();
+      if (cleaned) setGeneratedName(cleaned);
     } catch (e) {
       console.error("[Create] name regen error:", e);
     } finally {
@@ -89,75 +121,77 @@ export default function CharacterCreate() {
     }
   };
 
-  // Step 3: generate avatar directly via edge function fetch
+  // STEP 2: Style selected → generate lore
+  const handleStyleSelect = async (s: Style) => {
+    setStyle(s);
+    if (!gender) return;
+    setIsGeneratingLore(true);
+    try {
+      const name = generatedName || (gender === "Бабай" ? "Бурьяник" : "Тьмарица");
+      const prompt = `Напиши короткую историю происхождения (3-4 предложения) для духа-Бабая по имени ${name}, пол: ${gender}, визуальный стиль мира: ${s}. История должна быть атмосферной, жуткой и немного абсурдной. Верни только текст истории без заголовков.`;
+      console.log(`[Create] generating lore for "${name}" style="${s}"`);
+      const data = await callProtalk("text", prompt, tgId);
+      const lore = (data.text || "").trim();
+      setGeneratedLore(lore);
+      console.log(`[Create] lore set: "${lore.substring(0, 80)}..."`);
+    } catch (e) {
+      console.error("[Create] lore gen error:", e);
+      setGeneratedLore("");
+    } finally {
+      setIsGeneratingLore(false);
+    }
+  };
+
+  // STEP 3: Generate avatar using name + style + wishes
   const handleGenerateAvatar = async () => {
     if (!gender || !style || isGeneratingAvatar) return;
     setIsGeneratingAvatar(true);
     setAvatarStatus("generating");
+    setGeneratedAvatarUrl("");
+    setSelectedDefaultImage(null);
 
     const name = generatedName || "Бабай";
-    const wishesStr = wishes.length > 0 ? wishes.join(", ") : "нет особых пожеланий";
+    const wishesStr = wishes.length > 0 ? wishes.join(", ") : "обычная внешность";
+    const prompt = `Нарисуй детализированный портрет духа-пугала по имени ${name} (${gender}). Одежда: старая пижама в полоску. Внешность: страшная но смешная, длинный язык больше метра, безумный взгляд. Особые приметы: ${wishesStr}. Художественный стиль: ${style}. Высокое качество, атмосферный портрет, тёмный фон.`;
 
-    // Build prompt directly
-    const prompt = `Нарисуй портрет славянского кибернетического духа по имени ${name} (${gender}). Наряд: пижама. Внешность: страшная и смешная, длинный язык больше метра. Стиль: ${style}. Особые приметы: ${wishesStr}. Высокое качество, детализированный, атмосферный.`;
-
-    console.log(`[Create] avatar fetch start: tgId=${tgId}, prompt="${prompt.substring(0, 80)}..."`);
+    console.log(`[Create] generating avatar: tgId=${tgId}, name="${name}", style="${style}", wishes="${wishesStr}"`);
 
     try {
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
+      const data = await callProtalk("image", prompt, tgId);
+      const rawUrl = data.imageUrl || null;
+      console.log(`[Create] got rawUrl from ProTalk: ${rawUrl}`);
+
+      if (!rawUrl || !rawUrl.startsWith("http")) {
+        console.warn("[Create] no valid imageUrl from ProTalk");
+        setAvatarStatus("idle");
+        return;
+      }
+
+      // Save to Supabase Storage + Telegram + gallery
+      setAvatarStatus("uploading");
+      console.log(`[Create] saving to storage & telegram via save-to-gallery`);
+
+      const galResp = await fetch(`${SUPABASE_URL}/functions/v1/save-to-gallery`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ type: "image", prompt, telegramId: tgId }),
+        body: JSON.stringify({
+          imageUrl: rawUrl,
+          telegramId: tgId,
+          label: `Аватар: ${name}`,
+          prompt,
+          lore: generatedLore || null,
+        }),
       });
 
-      console.log(`[Create] avatar fetch status: ${resp.status}`);
+      const galData = await galResp.json();
+      console.log(`[Create] save-to-gallery result: success=${galData.success}, storage_url=${galData.storage_url}`);
 
-      if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`protalk-ai ${resp.status}: ${errText}`);
-      }
-
-      const data = await resp.json();
-      console.log(`[Create] avatar response: success=${data.success}, imageUrl=${data.imageUrl}`);
-
-      const rawUrl: string | null = data.imageUrl || null;
-
-      if (rawUrl && rawUrl.startsWith("http")) {
-        // Try to save to gallery via Telegram for stable URL
-        if (tgId) {
-          setAvatarStatus("sending_tg");
-          try {
-            const galResp = await fetch(`${SUPABASE_URL}/functions/v1/save-to-gallery`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({ imageUrl: rawUrl, telegramId: tgId, label: `Аватар: ${name}`, prompt }),
-            });
-            const galData = await galResp.json();
-            console.log(`[Create] gallery save: success=${galData.success}, url=${galData.gallery_item?.image_url}`);
-            if (galData.success && galData.gallery_item?.image_url) {
-              setGeneratedAvatarUrl(galData.gallery_item.image_url);
-            } else {
-              setGeneratedAvatarUrl(rawUrl);
-            }
-          } catch (galErr) {
-            console.warn("[Create] gallery save failed, using raw url:", galErr);
-            setGeneratedAvatarUrl(rawUrl);
-          }
-        } else {
-          setGeneratedAvatarUrl(rawUrl);
-        }
-        setAvatarStatus("done");
-      } else {
-        console.warn("[Create] no valid imageUrl from ProTalk, using fallback");
-        setGeneratedAvatarUrl("");
-        setAvatarStatus("idle");
-      }
+      const finalUrl = galData.storage_url || galData.gallery_item?.image_url || rawUrl;
+      setGeneratedAvatarUrl(finalUrl);
+      setAvatarStatus("done");
     } catch (e) {
       console.error("[Create] avatar generation failed:", e);
       setAvatarStatus("idle");
@@ -176,7 +210,7 @@ export default function CharacterCreate() {
     setCharacter({ name, gender, style, wishes, avatarUrl: finalUrl, telekinesisLevel: 1 });
     if (generatedLore) updateCharacter({ lore: generatedLore });
 
-    // Persist lore if available
+    // Persist lore
     if (tgId && generatedLore) {
       supabase.from("player_stats").update({ lore: generatedLore }).eq("telegram_id", tgId).then();
     }
@@ -236,14 +270,19 @@ export default function CharacterCreate() {
 
       <div className="flex-1 overflow-y-auto pb-20">
 
-        {/* STEP 1: Gender */}
+        {/* STEP 1: Gender → triggers name generation */}
         {step === 1 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             <h3 className="text-xl font-bold text-white">Кто ты?</h3>
+            <p className="text-xs text-neutral-400">Выбери пол — и сразу будет придумано имя твоего духа</p>
             <div className="grid grid-cols-2 gap-4">
               {(["Бабай", "Бабайка"] as Gender[]).map((g) => (
-                <button key={g} onClick={() => { setGender(g); setStep(2); }}
-                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${gender === g ? "border-red-600 bg-red-900/20" : "border-neutral-800 bg-neutral-900 hover:border-neutral-600"}`}>
+                <button
+                  key={g}
+                  onClick={() => handleGenderSelect(g)}
+                  disabled={isGeneratingName}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${gender === g ? "border-red-600 bg-red-900/20" : "border-neutral-800 bg-neutral-900 hover:border-neutral-600"} disabled:opacity-60`}
+                >
                   <div className="text-4xl">{g === "Бабай" ? "👴" : "👵"}</div>
                   <span className="font-bold text-lg">{g}</span>
                   <span className="text-xs text-neutral-500 text-center">{g === "Бабай" ? "Мужской дух" : "Женский дух"}</span>
@@ -253,18 +292,45 @@ export default function CharacterCreate() {
           </motion.div>
         )}
 
-        {/* STEP 2: Style → auto-generates name+lore */}
+        {/* STEP 2: Show generated name + Style selector → triggers lore */}
         {step === 2 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+
+            {/* Name card */}
+            <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-4">
+              <p className="text-xs text-neutral-500 mb-1">Имя духа</p>
+              {isGeneratingName ? (
+                <div className="flex items-center gap-2 text-neutral-400">
+                  <Loader2 size={16} className="animate-spin text-red-400" />
+                  <span className="text-sm">Призываем имя из тьмы...</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-2xl font-black text-red-400">{generatedName}</p>
+                  <button
+                    onClick={handleRegenerateName}
+                    disabled={isGeneratingName}
+                    className="p-2 rounded-xl border border-neutral-700 hover:border-red-600 hover:bg-red-900/20 text-neutral-400 hover:text-red-400 transition-all disabled:opacity-40"
+                    title="Перегенерировать имя"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
             <h3 className="text-xl font-bold text-white">Выбери стиль</h3>
-            <p className="text-xs text-neutral-400">После выбора стиля автоматически создаётся имя и история. Затем перейдёшь к выбору внешности.</p>
+            <p className="text-xs text-neutral-400">После выбора стиля появится история твоего духа</p>
             <div className="grid grid-cols-2 gap-3">
               {STYLES.map((s) => (
-                <button key={s} onClick={() => handleStyleSelect(s)}
-                  disabled={isGeneratingName}
-                  className={`p-3 rounded-xl border text-sm font-medium transition-all relative ${style === s ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:bg-neutral-800"} disabled:opacity-60`}>
+                <button
+                  key={s}
+                  onClick={() => handleStyleSelect(s)}
+                  disabled={isGeneratingName || isGeneratingLore}
+                  className={`p-3 rounded-xl border text-sm font-medium transition-all relative ${style === s ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:bg-neutral-800"} disabled:opacity-60`}
+                >
                   {s}
-                  {style === s && isGeneratingName && (
+                  {style === s && isGeneratingLore && (
                     <span className="absolute top-1 right-1"><Loader2 size={12} className="animate-spin text-red-400" /></span>
                   )}
                 </button>
@@ -272,58 +338,66 @@ export default function CharacterCreate() {
             </div>
 
             <AnimatePresence>
-              {(generatedName || isGeneratingName) && (
+              {(generatedLore || isGeneratingLore) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-neutral-900 border border-neutral-700 rounded-2xl p-4 flex items-center justify-between"
+                  className="bg-neutral-900/80 border border-red-900/40 rounded-2xl p-4"
                 >
-                  <div>
-                    <p className="text-xs text-neutral-500 mb-1">Имя духа</p>
-                    {isGeneratingName ? (
-                      <div className="flex items-center gap-2 text-neutral-400">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="text-sm">Призываем имя...</span>
-                      </div>
-                    ) : (
-                      <p className="text-xl font-black text-red-400">{generatedName}</p>
-                    )}
-                  </div>
-                  {!isGeneratingName && generatedName && (
-                    <button onClick={handleRegenerateName}
-                      className="p-2 rounded-xl border border-neutral-700 hover:border-red-600 hover:bg-red-900/20 text-neutral-400 hover:text-red-400 transition-all">
-                      <RefreshCw size={16} />
-                    </button>
+                  <p className="text-xs text-red-400/70 mb-2 uppercase tracking-wider">История духа</p>
+                  {isGeneratingLore ? (
+                    <div className="flex items-center gap-2 text-neutral-400">
+                      <Loader2 size={14} className="animate-spin text-red-400" />
+                      <span className="text-sm">Пишем легенду...</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-neutral-300 leading-relaxed">{generatedLore}</p>
                   )}
                 </motion.div>
               )}
             </AnimatePresence>
 
             <button
-              disabled={!style || isGeneratingName}
+              disabled={!style || isGeneratingName || isGeneratingLore}
               onClick={() => setStep(3)}
               className="w-full py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isGeneratingName
-                ? <><Loader2 size={16} className="animate-spin" /> Создаём имя...</>
+              {isGeneratingLore
+                ? <><Loader2 size={16} className="animate-spin" /> Создаём историю...</>
                 : <>Далее <ArrowRight size={18} /></>
               }
             </button>
           </motion.div>
         )}
 
-        {/* STEP 3: Wishes + Avatar */}
+        {/* STEP 3: Wishes + Avatar generation */}
         {step === 3 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center text-lg">
+                  {gender === "Бабай" ? "👴" : "👵"}
+                </div>
+                <div>
+                  <p className="font-bold text-red-400">{generatedName}</p>
+                  <p className="text-xs text-neutral-500">{style} · {gender}</p>
+                </div>
+              </div>
+            </div>
+
             <h3 className="text-xl font-bold text-white">Особые приметы</h3>
-            <p className="text-xs text-neutral-400">Выбери до 4 пожеланий для внешности, затем сгенерируй аватар.</p>
+            <p className="text-xs text-neutral-400">Выбери до 4 — они войдут в аватар</p>
             <div className="flex flex-wrap gap-2">
               {WISHES_OPTIONS.map((w) => {
                 const isSelected = wishes.includes(w);
                 const isDisabled = !isSelected && wishes.length >= 4;
                 return (
-                  <button key={w} disabled={isDisabled} onClick={() => toggleWish(w)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${isSelected ? "border-red-500 bg-red-900/40 text-red-200" : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:bg-neutral-700"} ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}>
+                  <button
+                    key={w}
+                    disabled={isDisabled}
+                    onClick={() => toggleWish(w)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${isSelected ? "border-red-500 bg-red-900/40 text-red-200" : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:bg-neutral-700"} ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
+                  >
                     {w}
                   </button>
                 );
@@ -337,31 +411,46 @@ export default function CharacterCreate() {
               <AnimatePresence mode="wait">
                 {currentAvatarPreview ? (
                   <motion.div key="preview" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative mb-4">
-                    <img src={currentAvatarPreview} alt="Аватар"
-                      className="w-full max-h-64 object-cover rounded-2xl border-2 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]" />
+                    <img
+                      src={currentAvatarPreview}
+                      alt="Аватар"
+                      className="w-full max-h-72 object-cover rounded-2xl border-2 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                    />
                     {!selectedDefaultImage && avatarStatus === "done" && (
                       <div className="absolute top-2 right-2 bg-green-900/80 border border-green-600 rounded-lg px-2 py-1 flex items-center gap-1">
                         <CheckCircle size={12} className="text-green-400" />
-                        <span className="text-xs text-green-400">В галерее</span>
+                        <span className="text-xs text-green-400">В Telegram и галерее</span>
                       </div>
                     )}
                   </motion.div>
                 ) : isGeneratingAvatar ? (
-                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="w-full h-48 rounded-2xl border-2 border-neutral-700 flex flex-col items-center justify-center gap-3 bg-neutral-900/50 mb-4">
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="w-full h-48 rounded-2xl border-2 border-neutral-700 flex flex-col items-center justify-center gap-3 bg-neutral-900/50 mb-4"
+                  >
                     <Loader2 size={32} className="animate-spin text-red-500" />
                     <p className="text-sm text-neutral-400">
-                      {avatarStatus === "sending_tg" ? "Отправляем в Telegram..." : "Генерируем облик..."}
+                      {avatarStatus === "uploading" ? "Сохраняем в хранилище..." :
+                       avatarStatus === "sending_tg" ? "Отправляем в Telegram..." :
+                       "Генерируем облик через ProTalk..."}
                     </p>
                   </motion.div>
                 ) : null}
               </AnimatePresence>
 
               {!selectedDefaultImage && (
-                <button onClick={handleGenerateAvatar} disabled={isGeneratingAvatar}
-                  className="w-full py-3 border border-red-700 bg-red-900/20 hover:bg-red-900/40 text-red-300 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait mb-4">
+                <button
+                  onClick={handleGenerateAvatar}
+                  disabled={isGeneratingAvatar}
+                  className="w-full py-3 border border-red-700 bg-red-900/20 hover:bg-red-900/40 text-red-300 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait mb-4"
+                >
                   {isGeneratingAvatar
-                    ? <><Loader2 size={16} className="animate-spin" /> {avatarStatus === "sending_tg" ? "Отправляем в Telegram..." : "Генерируем..."}</>
+                    ? <><Loader2 size={16} className="animate-spin" /> {
+                        avatarStatus === "uploading" ? "Сохраняем..." :
+                        "Генерируем..."
+                      }</>
                     : <><Sparkles size={16} /> {generatedAvatarUrl ? "Перегенерировать аватар" : "Сгенерировать аватар ИИ"}</>
                   }
                 </button>
@@ -369,28 +458,39 @@ export default function CharacterCreate() {
 
               <p className="text-xs text-neutral-500 mb-3 text-center">— или выбери готовый —</p>
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
-                <div onClick={() => setSelectedDefaultImage(null)}
-                  className={`min-w-[80px] h-[80px] rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer snap-center transition-all flex-shrink-0 ${selectedDefaultImage === null && !generatedAvatarUrl ? "border-red-500 bg-red-900/20" : "border-neutral-700 bg-neutral-900 hover:border-neutral-500"}`}>
-                  <Sparkles size={18} className="text-neutral-400" />
-                  <span className="text-xs mt-1 text-neutral-500">ИИ</span>
+                <div
+                  onClick={() => setSelectedDefaultImage(null)}
+                  className={`snap-start flex-shrink-0 w-20 h-20 rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${!selectedDefaultImage && !generatedAvatarUrl ? "border-red-600" : "border-neutral-700 hover:border-neutral-500"}`}
+                >
+                  <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-2xl">🤖</div>
                 </div>
                 {DEFAULT_GALLERY_IMAGES.map((img, idx) => (
-                  <div key={idx} onClick={() => setSelectedDefaultImage(img)}
-                    className={`min-w-[80px] h-[80px] rounded-xl border-2 overflow-hidden cursor-pointer snap-center transition-all flex-shrink-0 ${selectedDefaultImage === img ? "border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.4)]" : "border-neutral-700 hover:border-neutral-500"}`}>
-                    <img src={img} alt={`Аватар ${idx + 1}`} className="w-full h-full object-cover" />
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedDefaultImage(img)}
+                    className={`snap-start flex-shrink-0 w-20 h-20 rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${selectedDefaultImage === img ? "border-red-600" : "border-neutral-700 hover:border-neutral-500"}`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
             </div>
 
+            {generatedLore && (
+              <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
+                <p className="text-xs text-red-400/60 mb-1 uppercase tracking-wider">История</p>
+                <p className="text-xs text-neutral-400 leading-relaxed line-clamp-3">{generatedLore}</p>
+              </div>
+            )}
+
             <button
-              disabled={!gender || !style || isSaving}
               onClick={handleFinish}
-              className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+              disabled={isSaving || (!generatedAvatarUrl && !selectedDefaultImage)}
+              className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {isSaving
-                ? <><Loader2 size={16} className="animate-spin" /> Сохраняем...</>
-                : <>Призвать духа <Sparkles size={18} /></>
+                ? <><Loader2 size={16} className="animate-spin" /> Сохраняем духа...</>
+                : <>Войти в мир Бабаев <ArrowRight size={18} /></>
               }
             </button>
           </motion.div>

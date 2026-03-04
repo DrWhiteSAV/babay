@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, telegramId, label, prompt } = await req.json();
+    const { imageUrl, telegramId, label, prompt, lore, saveToStorage } = await req.json();
 
     if (!imageUrl || !telegramId) {
       return new Response(JSON.stringify({ error: "imageUrl and telegramId are required" }), {
@@ -28,66 +28,97 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let finalUrl = imageUrl;
+    let storageUrl: string | null = null;
 
-    // If it's a base64 image or external URL, send via Telegram to get a hosted URL
-    if (imageUrl.startsWith("data:image") || imageUrl.startsWith("http")) {
-      let photoBlob: Blob;
-
-      if (imageUrl.startsWith("data:image")) {
-        // Convert base64 to blob
-        const base64Data = imageUrl.split(",")[1];
-        const byteCharacters = atob(base64Data);
-        const byteArray = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteArray[i] = byteCharacters.charCodeAt(i);
-        }
-        photoBlob = new Blob([byteArray], { type: "image/png" });
-      } else {
-        // Fetch external URL
-        const imgResp = await fetch(imageUrl);
-        photoBlob = await imgResp.blob();
+    // 1. Fetch the image blob
+    console.log(`[save-to-gallery] fetching image: ${imageUrl.substring(0, 80)}`);
+    let photoBlob: Blob;
+    if (imageUrl.startsWith("data:image")) {
+      const base64Data = imageUrl.split(",")[1];
+      const byteCharacters = atob(base64Data);
+      const byteArray = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteArray[i] = byteCharacters.charCodeAt(i);
       }
+      photoBlob = new Blob([byteArray], { type: "image/png" });
+    } else {
+      const imgResp = await fetch(imageUrl);
+      if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`);
+      photoBlob = await imgResp.blob();
+    }
 
-      // Send photo to user via Telegram bot
-      const formData = new FormData();
-      formData.append("chat_id", telegramId.toString());
-      formData.append("photo", photoBlob, "gallery.png");
-      if (label) formData.append("caption", `🖼 ${label}`);
-
-      const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-        method: "POST",
-        body: formData,
+    // 2. Save to Supabase Storage (avatars bucket)
+    const fileName = `${telegramId}/${Date.now()}.png`;
+    console.log(`[save-to-gallery] uploading to storage: avatars/${fileName}`);
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from("avatars")
+      .upload(fileName, photoBlob, {
+        contentType: "image/png",
+        upsert: false,
       });
 
-      const tgData = await tgResp.json();
+    if (storageError) {
+      console.error("[save-to-gallery] storage upload error:", storageError);
+    } else {
+      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
+      storageUrl = publicUrlData?.publicUrl || null;
+      finalUrl = storageUrl || imageUrl;
+      console.log(`[save-to-gallery] storage url: ${finalUrl}`);
+    }
 
-      if (!tgData.ok) {
-        console.error("Telegram sendPhoto error:", tgData);
-        // Fall back to saving the original URL if sending to Telegram fails
-        finalUrl = imageUrl.startsWith("data:image") ? imageUrl : imageUrl;
-      } else {
-        // Get the highest-res file_id from the photo array
-        const photos = tgData.result?.photo;
-        if (photos && photos.length > 0) {
-          const biggestPhoto = photos[photos.length - 1];
-          
-          // Get file path from Telegram
-          const fileResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${biggestPhoto.file_id}`);
-          const fileData = await fileResp.json();
-          
-          if (fileData.ok && fileData.result?.file_path) {
-            finalUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-          }
+    // 3. Send to Telegram with lore caption
+    const caption = lore
+      ? `🧟 *${label || "Аватар Бабая"}*\n\n${lore}`
+      : `🖼 ${label || "Аватар Бабая"}`;
+
+    console.log(`[save-to-gallery] sending to telegram user ${telegramId}`);
+    const formData = new FormData();
+    formData.append("chat_id", telegramId.toString());
+    formData.append("photo", photoBlob, "avatar.png");
+    formData.append("caption", caption);
+    formData.append("parse_mode", "Markdown");
+
+    const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const tgData = await tgResp.json();
+    console.log(`[save-to-gallery] telegram response ok=${tgData.ok}`);
+
+    if (!tgData.ok) {
+      console.error("[save-to-gallery] Telegram sendPhoto error:", JSON.stringify(tgData));
+      // Don't throw — we still have the storage URL
+    } else {
+      // Optionally use Telegram's file URL as a CDN fallback
+      const photos = tgData.result?.photo;
+      if (photos && photos.length > 0 && !storageUrl) {
+        const biggestPhoto = photos[photos.length - 1];
+        const fileResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${biggestPhoto.file_id}`);
+        const fileData = await fileResp.json();
+        if (fileData.ok && fileData.result?.file_path) {
+          finalUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
         }
       }
     }
 
-    // Save to gallery table in Supabase
+    // 4. Update player_stats avatar_url
+    console.log(`[save-to-gallery] updating player_stats avatar_url for ${telegramId}`);
+    const { error: statsError } = await supabase
+      .from("player_stats")
+      .update({ avatar_url: storageUrl || finalUrl })
+      .eq("telegram_id", telegramId);
+
+    if (statsError) {
+      console.error("[save-to-gallery] player_stats update error:", statsError);
+    }
+
+    // 5. Save to gallery table
     const { data, error } = await supabase
       .from("gallery")
       .insert({
         telegram_id: telegramId,
-        image_url: finalUrl,
+        image_url: storageUrl || finalUrl,
         label: label || null,
         prompt: prompt || null,
       })
@@ -95,18 +126,23 @@ serve(async (req) => {
       .single();
 
     if (error) {
-      console.error("Supabase gallery insert error:", error);
+      console.error("[save-to-gallery] gallery insert error:", error);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ success: true, gallery_item: data }), {
+    console.log(`[save-to-gallery] done! final_url=${storageUrl || finalUrl}`);
+    return new Response(JSON.stringify({
+      success: true,
+      gallery_item: data,
+      storage_url: storageUrl || finalUrl,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("save-to-gallery error:", e);
+    console.error("[save-to-gallery] error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

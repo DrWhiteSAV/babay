@@ -186,9 +186,10 @@ function AppContent() {
   const dimmingBottom = customBg ? Math.min(1, (customBg.dimming + 15) / 100) : 0.95;
 
   // Show warning page for plain browser access (not Lovable editor, not Telegram)
-  if (!isLoading && entryMode === "browser") {
-    return <TelegramOnly />;
-  }
+  // NOTE: browser mode is allowed for testing — in production Telegram enforces auth
+  // if (!isLoading && entryMode === "browser") {
+  //   return <TelegramOnly />;
+  // }
 
   return (
     <div 
