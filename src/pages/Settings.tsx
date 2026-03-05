@@ -11,17 +11,64 @@ import {
   Bell,
   ChevronRight,
   Loader2,
+  Save,
 } from "lucide-react";
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
-
 import Header from "../components/Header";
+
+const DEFAULT_SETTINGS = {
+  buttonSize: "small" as ButtonSize,
+  fontFamily: "JetBrains Mono" as FontFamily,
+  fontSize: 12,
+  fontBrightness: 100,
+  theme: "normal" as Theme,
+  musicVolume: 50,
+  ttsEnabled: false,
+};
 
 export default function Settings() {
   const navigate = useNavigate();
   const { settings, updateSettings, character } = usePlayerStore();
   const { profile } = useTelegram();
   const [resetting, setResetting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const telegramId = profile?.telegram_id;
+      if (telegramId) {
+        // Merge settings into custom_settings in DB
+        const { data: existing } = await supabase
+          .from("player_stats")
+          .select("custom_settings")
+          .eq("telegram_id", telegramId)
+          .single();
+        
+        const existingCs = (existing?.custom_settings as any) || {};
+        await supabase.from("player_stats").upsert({
+          telegram_id: telegramId,
+          custom_settings: {
+            ...existingCs,
+            buttonSize: settings.buttonSize,
+            fontFamily: settings.fontFamily,
+            fontSize: settings.fontSize,
+            fontBrightness: settings.fontBrightness,
+            theme: settings.theme,
+            musicVolume: settings.musicVolume,
+            ttsEnabled: settings.ttsEnabled,
+          },
+        }, { onConflict: "telegram_id" });
+      }
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2000);
+    } catch (e) {
+      console.error("Save settings error:", e);
+    }
+    setSaving(false);
+  };
 
   const handleResetProgress = async () => {
     if (!window.confirm("Вы уверены? Весь прогресс, персонаж, очки и инвентарь будут удалены безвозвратно.")) return;
@@ -35,12 +82,20 @@ export default function Settings() {
       const telegramId = profile?.telegram_id;
       if (telegramId) {
         await Promise.all([
-          // Сбрасываем player_stats (обнуляем поля вместо удаления, чтобы не нарушать FK)
           supabase.from("player_stats").update({
             fear: 0, watermelons: 0, energy: 100, boss_level: 0,
             telekinesis_level: 0, total_clicks: 0,
             character_name: null, character_gender: null, character_style: null,
-            avatar_url: null, lore: null, custom_settings: {},
+            avatar_url: null, lore: null,
+            custom_settings: {
+              buttonSize: DEFAULT_SETTINGS.buttonSize,
+              fontFamily: DEFAULT_SETTINGS.fontFamily,
+              fontSize: DEFAULT_SETTINGS.fontSize,
+              fontBrightness: DEFAULT_SETTINGS.fontBrightness,
+              theme: DEFAULT_SETTINGS.theme,
+              musicVolume: DEFAULT_SETTINGS.musicVolume,
+              ttsEnabled: DEFAULT_SETTINGS.ttsEnabled,
+            },
           }).eq("telegram_id", telegramId),
           supabase.from("player_inventory").delete().eq("telegram_id", telegramId),
           supabase.from("player_achievements").delete().eq("telegram_id", telegramId),
@@ -50,7 +105,7 @@ export default function Settings() {
     } catch (e) {
       console.error("Reset error:", e);
     }
-    // Сбрасываем store и localStorage
+    // Reset store + settings to defaults
     usePlayerStore.setState({
       character: null,
       fear: 0,
@@ -62,6 +117,7 @@ export default function Settings() {
       achievements: [],
       friends: [{ name: "ДанИИл", isAiEnabled: true }],
       quests: [],
+      settings: { ...DEFAULT_SETTINGS },
     });
     localStorage.removeItem("babai-storage");
     setResetting(false);
@@ -72,26 +128,6 @@ export default function Settings() {
     navigate("/");
     return null;
   }
-
-  const handleButtonSizeChange = (size: ButtonSize) => {
-    updateSettings({ buttonSize: size });
-  };
-
-  const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateSettings({ fontSize: parseInt(e.target.value, 10) });
-  };
-
-  const handleFontFamilyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateSettings({ fontFamily: e.target.value as FontFamily });
-  };
-
-  const handleThemeChange = (theme: Theme) => {
-    updateSettings({ theme });
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateSettings({ musicVolume: parseInt(e.target.value) });
-  };
 
   return (
     <motion.div
@@ -120,20 +156,16 @@ export default function Settings() {
             {(["small", "medium", "large"] as ButtonSize[]).map((size) => (
               <button
                 key={size}
-                onClick={() => handleButtonSizeChange(size)}
+                onClick={() => updateSettings({ buttonSize: size })}
                 className={`p-3 rounded-xl border font-medium transition-all ${settings.buttonSize === size ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900/50 backdrop-blur-sm text-white hover:bg-neutral-800"}`}
               >
-                {size === "small"
-                  ? "Мелкие"
-                  : size === "medium"
-                    ? "Средние"
-                    : "Крупные"}
+                {size === "small" ? "Мелкие" : size === "medium" ? "Средние" : "Крупные"}
               </button>
             ))}
           </div>
         </section>
 
-        {/* Theme Selection */}
+        {/* Theme */}
         <section>
           <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-2">
             <Square size={18} /> Тема оформления
@@ -142,7 +174,7 @@ export default function Settings() {
             {(["normal", "cyberpunk"] as Theme[]).map((theme) => (
               <button
                 key={theme}
-                onClick={() => handleThemeChange(theme)}
+                onClick={() => updateSettings({ theme })}
                 className={`p-3 rounded-xl border font-bold transition-all uppercase tracking-wider ${settings.theme === theme ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900/50 backdrop-blur-sm text-white hover:bg-neutral-800"}`}
               >
                 {theme === "normal" ? "Обычная" : "Киберпанк"}
@@ -158,24 +190,23 @@ export default function Settings() {
           </h2>
           <div className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-4">
             <select
-              id="fontFamily"
               value={settings.fontFamily ?? "JetBrains Mono"}
-              onChange={handleFontFamilyChange}
+              onChange={(e) => updateSettings({ fontFamily: e.target.value as FontFamily })}
               className="w-full bg-neutral-800/50 text-white border border-neutral-700 rounded-xl p-3 outline-none focus:border-red-500 transition-colors"
             >
-              <option value="Inter" className="font-sans">Обычный (Inter)</option>
-              <option value="Roboto" style={{ fontFamily: "'Roboto', sans-serif" }}>Робото (Roboto)</option>
-              <option value="Montserrat" style={{ fontFamily: "'Montserrat', sans-serif" }}>Монтсеррат (Montserrat)</option>
-              <option value="Playfair Display" style={{ fontFamily: "'Playfair Display', serif" }}>Классический (Playfair)</option>
-              <option value="JetBrains Mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Технический (JetBrains)</option>
-              <option value="Press Start 2P" style={{ fontFamily: "'Press Start 2P', cursive" }}>Ретро (8-bit)</option>
-              <option value="Russo One" style={{ fontFamily: "'Russo One', sans-serif" }}>Мощный (Russo One)</option>
-              <option value="Rubik Beastly" style={{ fontFamily: "'Rubik Beastly', cursive" }}>Монстр (Rubik Beastly)</option>
-              <option value="Rubik Burned" style={{ fontFamily: "'Rubik Burned', cursive" }}>Сгоревший (Rubik Burned)</option>
-              <option value="Rubik Glitch" style={{ fontFamily: "'Rubik Glitch', cursive" }}>Глитч (Rubik Glitch)</option>
-              <option value="Neucha" style={{ fontFamily: "'Neucha', cursive" }}>Рукописный (Neucha)</option>
-              <option value="Ruslan Display" style={{ fontFamily: "'Ruslan Display', cursive" }}>Славянский (Ruslan)</option>
-              <option value="Tektur" style={{ fontFamily: "'Tektur', sans-serif" }}>Киберпанк (Tektur)</option>
+              <option value="Inter">Обычный (Inter)</option>
+              <option value="Roboto">Робото (Roboto)</option>
+              <option value="Montserrat">Монтсеррат (Montserrat)</option>
+              <option value="Playfair Display">Классический (Playfair)</option>
+              <option value="JetBrains Mono">Технический (JetBrains)</option>
+              <option value="Press Start 2P">Ретро (8-bit)</option>
+              <option value="Russo One">Мощный (Russo One)</option>
+              <option value="Rubik Beastly">Монстр (Rubik Beastly)</option>
+              <option value="Rubik Burned">Сгоревший (Rubik Burned)</option>
+              <option value="Rubik Glitch">Глитч (Rubik Glitch)</option>
+              <option value="Neucha">Рукописный (Neucha)</option>
+              <option value="Ruslan Display">Славянский (Ruslan)</option>
+              <option value="Tektur">Киберпанк (Tektur)</option>
             </select>
           </div>
         </section>
@@ -187,17 +218,13 @@ export default function Settings() {
           </h2>
           <div className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-6">
             <input
-              id="fontSize"
-              type="range"
-              min="5"
-              max="24"
-              value={settings.fontSize ?? 16}
-              onChange={handleFontSizeChange}
+              type="range" min="5" max="24"
+              value={settings.fontSize ?? 12}
+              onChange={(e) => updateSettings({ fontSize: parseInt(e.target.value, 10) })}
               className="w-full accent-red-600 h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex justify-between text-xs text-white mt-4 font-mono">
-              <span>5px</span>
-              <span>24px</span>
+              <span>5px</span><span>24px</span>
             </div>
           </div>
         </section>
@@ -209,17 +236,13 @@ export default function Settings() {
           </h2>
           <div className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-6">
             <input
-              id="fontBrightness"
-              type="range"
-              min="0"
-              max="100"
+              type="range" min="0" max="100"
               value={settings.fontBrightness ?? 100}
               onChange={(e) => updateSettings({ fontBrightness: parseInt(e.target.value, 10) })}
               className="w-full accent-red-600 h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex justify-between text-xs text-white mt-4 font-mono">
-              <span>0%</span>
-              <span>100%</span>
+              <span>0%</span><span>100%</span>
             </div>
           </div>
         </section>
@@ -244,26 +267,38 @@ export default function Settings() {
           </h2>
           <div className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-6">
             <input
-              id="musicVolume"
-              type="range"
-              min="0"
-              max="100"
+              type="range" min="0" max="100"
               value={settings.musicVolume ?? 50}
-              onChange={handleVolumeChange}
+              onChange={(e) => updateSettings({ musicVolume: parseInt(e.target.value) })}
               className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
             <div className="flex justify-between text-xs text-white mt-4">
               <span>0%</span>
-              <span className="text-white font-bold">
-                {settings.musicVolume}%
-              </span>
+              <span className="text-white font-bold">{settings.musicVolume}%</span>
               <span>100%</span>
             </div>
           </div>
         </section>
 
+        {/* Save Settings Button */}
+        <section>
+          <button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+              savedOk
+                ? "bg-green-800 border border-green-600 text-green-300"
+                : "bg-red-900/30 hover:bg-red-900/50 border border-red-700 text-red-300"
+            }`}
+          >
+            {saving ? <><Loader2 size={18} className="animate-spin" /> Сохранение...</> :
+             savedOk ? <>✓ Сохранено!</> :
+             <><Save size={18} /> СОХРАНИТЬ НАСТРОЙКИ</>}
+          </button>
+        </section>
+
         {/* Reset Data */}
-        <section className="pt-8 space-y-4">
+        <section className="pt-4 space-y-4">
           <button
             onClick={() => {
               if (window.confirm("Очистить галерею? Это освободит место в памяти устройства.")) {

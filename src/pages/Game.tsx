@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import {
   generateScenario,
@@ -22,6 +22,7 @@ import {
 import { CutscenePlayer } from "../components/CutscenePlayer";
 import { saveImageToGallery } from "../utils/galleryUtils";
 import { useTelegram } from "../context/TelegramContext";
+import danIIlAvatar from "../assets/daniil.png";
 
 type Difficulty = "Сложная" | "Невозможная" | "Бесконечная";
 
@@ -35,7 +36,6 @@ interface Scenario {
 
 export default function Game() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { character, fear, energy, useEnergy, addFear, settings, gallery, addToGallery, addWatermelons, inventory, watermelons, lastEnergyUpdate, bossLevel, globalBackgroundUrl, pageBackgrounds, storeConfig } =
     usePlayerStore();
   const { profile } = useTelegram();
@@ -47,12 +47,16 @@ export default function Game() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [bgImage, setBgImage] = useState<string>("");
+  const [bgGenStatus, setBgGenStatus] = useState<"idle" | "generating" | "done">("idle");
   const [score, setScore] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
   const [showScreamer, setShowScreamer] = useState(false);
   const [showSuccessAvatar, setShowSuccessAvatar] = useState(false);
   const [showCutscene, setShowCutscene] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+
+  // Game phase: after difficulty chosen but before world is generated
+  const [isGeneratingWorld, setIsGeneratingWorld] = useState(false);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -130,6 +134,15 @@ export default function Game() {
     };
   }, [isBossBattle, bossTimer, isBossDefeated, bossImage]);
 
+  // Get the default game background from admin panel settings
+  const getDefaultGameBg = () => {
+    // Try game-specific page background first, then global
+    const gameBg = pageBackgrounds["/game"];
+    if (gameBg?.url) return gameBg.url;
+    if (globalBackgroundUrl) return globalBackgroundUrl;
+    return "https://i.ibb.co/BVgY7XrT/babai.png";
+  };
+
   const startGame = async (diff: Difficulty) => {
     const cost = diff === "Сложная" ? 1 : diff === "Невозможная" ? 5 : 25;
     if (!useEnergy(cost)) {
@@ -147,9 +160,53 @@ export default function Game() {
     setLocalWatermelons(0);
     setExitedEarly(false);
     setPvpResults(null);
-    setPvpParticipants([]);
     setIsGameOver(false);
     setShowCutscene(true);
+
+    // Set default background immediately from admin panel
+    const defaultBg = getDefaultGameBg();
+    setBgImage(defaultBg);
+
+    // Now generate world background ONCE before first stage
+    if (character) {
+      setIsGeneratingWorld(true);
+      setBgGenStatus("generating");
+      
+      const charData: Record<string, string> = {
+        name: character.name,
+        gender: character.gender,
+        style: character.style,
+        wishes: character.wishes.join(", "),
+        telekinesis: String(character.telekinesisLevel),
+        lore: character.lore || "",
+        fear: String(fear),
+        watermelons: String(watermelons),
+        boss_level: String(bossLevel),
+        username: profile?.username || "",
+        first_name: profile?.first_name || "",
+        telegram_id: String(profile?.telegram_id || ""),
+        difficulty: diff,
+      };
+
+      try {
+        // Generate BG image separately (no concurrent text gen)
+        const bgResult = await generateBackgroundImage(1, character.style, charData, tgId);
+        if (bgResult.url && bgResult.url.startsWith("http")) {
+          setBgImage(bgResult.url);
+          addToGallery(bgResult.url);
+          // Save to gallery DB via ImgBB
+        if (tgId) {
+          saveImageToGallery(bgResult.url, tgId, `[backgrounds] Фон игры: ${diff}`, bgResult.prompt).catch(console.error);
+        }
+        }
+      } catch (e) {
+        console.warn("[Game] world bg gen failed, using default:", e);
+      }
+
+      setBgGenStatus("done");
+      setIsGeneratingWorld(false);
+    }
+
     await loadNextStage(1);
   };
 
@@ -187,10 +244,8 @@ export default function Game() {
       telegram_id: String(profile?.telegram_id || ""),
     } : {};
 
-    // tgId available from top-level const
-
-    // Boss Battle check (stages 16 and 46)
-    if (currentStage === 16 || currentStage === 46) {
+    // Boss Battle check (stage 16)
+    if (currentStage === 16) {
       setShowCutscene(true);
       // Wait for cutscene to complete (at least 3s) then generate boss image
       setBossTaps(0);
@@ -209,7 +264,7 @@ export default function Game() {
         setBossImage(typedResult.url);
         // Save boss image to gallery via ImgBB/save-to-gallery
         if (tgId) {
-          saveImageToGallery(typedResult.url, tgId, `Босс уровня ${bossLevel}`, typedResult.prompt).catch(console.error);
+          saveImageToGallery(typedResult.url, tgId, `[bosses] Босс уровня ${bossLevel}`, typedResult.prompt).catch(console.error);
         }
         // Small delay for page to render the boss image before starting timer
         await new Promise(r => setTimeout(r, 1000));
@@ -221,31 +276,7 @@ export default function Game() {
       return;
     }
 
-    // Default background (always set first, then replace with generated one)
-    const DEFAULT_GAME_BG = "https://i.ibb.co/BVgY7XrT/babai.png";
-    if (!bgImage) setBgImage(globalBackgroundUrl || DEFAULT_GAME_BG);
-
-    // Generate background image on stage 1 or every 5th stage
-    if (currentStage === 1 || currentStage % 5 === 0) {
-      if (character) {
-        generateBackgroundImage(currentStage, character.style, charData, tgId).then((result) => {
-          // Accept any URL including picsum - always set as bg
-          if (result.url) {
-            setBgImage(result.url);
-            addToGallery(result.url);
-            // Save to gallery via ImgBB/save-to-gallery (fire & forget) - only for non-picsum real images
-            if (tgId && !result.url.includes("picsum.photos")) {
-              saveImageToGallery(result.url, tgId, `Фон этапа ${currentStage}`, result.prompt).catch(console.error);
-            }
-          }
-        }).catch(err => {
-          console.warn("[Game] background gen failed:", err);
-          // Keep the default background
-        });
-      }
-    }
-
-    // Check if it's Danil time (every 5th stage)
+    // Check if it's Danil chat time (every 5th stage, starting from stage 5)
     if (currentStage > 1 && currentStage % 5 === 0) {
       setIsDanilChat(true);
       setChatMessages([
@@ -259,7 +290,7 @@ export default function Game() {
     }
 
     if (character) {
-      // Pre-generate next scenario before showing it
+      // Generate scenario text (separately from any image generation)
       const newScenario = await generateScenario(
         currentStage,
         difficulty || "Сложная",
@@ -271,7 +302,6 @@ export default function Game() {
       // Generate spooky voice for the scenario
       if (settings.ttsEnabled) {
         generateSpookyVoice(newScenario.text).then((audioData) => {
-          // Check if we are still on this stage and not loading
           if (audioData && audioRef.current && !isLoading) {
             audioRef.current.src = audioData;
             const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
@@ -281,11 +311,10 @@ export default function Game() {
                 .catch((e) => console.log("Audio play blocked", e));
             }
           } else if (!audioData && !isLoading) {
-            // Fallback to browser TTS if API fails
             if ('speechSynthesis' in window) {
               const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
               if (hasInteracted) {
-                window.speechSynthesis.cancel(); // Stop any previous speech
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(newScenario.text);
                 utterance.lang = 'ru-RU';
                 utterance.pitch = 0.5;
@@ -378,8 +407,6 @@ export default function Game() {
     const danilReply = await generateFriendChat(userMsg, "ДанИИл", character, character.style, recentMessages, undefined, profile?.telegram_id);
     setChatMessages((prev) => [...prev, { sender: "danil", text: danilReply }]);
     setIsDanilTyping(false);
-
-    // After Danil replies, give a button to continue
   };
 
   const continueAfterChat = () => {
@@ -428,6 +455,7 @@ export default function Game() {
     setIsGameOver(false);
     setIsPvpLobby(false);
     setShowCutscene(true);
+    setBgImage(getDefaultGameBg());
     await loadNextStage(1);
   };
 
@@ -728,14 +756,12 @@ export default function Game() {
 
       <audio ref={audioRef} className="hidden" />
       {/* Background Image */}
-      {bgImage && (
-        <div className="fixed inset-0 z-0 bg-neutral-950">
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-50 pointer-events-none transition-opacity duration-1000"
-            style={{ backgroundImage: `url(${bgImage})` }}
-          />
-        </div>
-      )}
+      <div className="fixed inset-0 z-0 bg-neutral-950">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-50 pointer-events-none transition-opacity duration-1000"
+          style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
+        />
+      </div>
       <div className="fixed inset-0 z-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none" />
 
       <div className="fog-container">
@@ -767,6 +793,11 @@ export default function Game() {
           </div>
         </div>
         <div className="flex gap-3 font-bold text-sm">
+          {bgGenStatus === "generating" && (
+            <span className="text-yellow-400 flex items-center gap-1 text-xs">
+              <Loader2 size={12} className="animate-spin" /> Мир
+            </span>
+          )}
           <span className="text-red-500 flex items-center gap-1">
             <Skull size={14} /> {pvpParticipants.length > 0 ? localFear : fear}
           </span>
@@ -776,214 +807,238 @@ export default function Game() {
         </div>
       </header>
 
+      {/* World generation screen */}
+      {isGeneratingWorld && (
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <motion.img 
+            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            src="https://i.ibb.co/BVgY7XrT/babai.png"
+            alt="Creating world"
+            className="w-48 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+          />
+          <p className="text-sm uppercase tracking-widest text-red-500 animate-pulse font-bold mb-2">
+            Создаю мир игры...
+          </p>
+          <p className="text-xs text-neutral-500">Генерирую атмосферный фон</p>
+        </div>
+      )}
+
       {/* Main Content Area */}
-      <div className="relative z-10 flex-1 flex flex-col p-6 overflow-y-auto">
-        <AnimatePresence mode="wait">
-          {isLoading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col items-center justify-center text-neutral-500"
-            >
-              <motion.img 
-                animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                src="https://i.ibb.co/BVgY7XrT/babai.png"
-                alt="Loading"
-                className="w-48 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]"
-              />
-              <p className="text-sm uppercase tracking-widest text-red-500 animate-pulse font-bold">
-                Генерация кошмара...
-              </p>
-            </motion.div>
-          ) : isBossBattle ? (
-            <motion.div
-              key="boss"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex-1 flex flex-col items-center justify-center"
-            >
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-black text-red-600 uppercase tracking-tighter mb-2">БИТВА С БОССОМ (УР. {bossLevel})</h3>
-                <div className="flex gap-4 justify-center">
-                  <span className="text-yellow-500">ВРЕМЯ: {bossTimer}с</span>
-                  <span className="text-red-500">УДАРЫ: {bossTaps}/{100 * Math.pow(2, bossLevel - 1)}</span>
-                </div>
-              </div>
-
-              <div 
-                onClick={handleBossTap}
-                className="relative w-64 h-64 md:w-80 md:h-80 rounded-3xl overflow-hidden border-4 border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.4)] cursor-pointer active:scale-95 transition-transform"
+      {!isGeneratingWorld && (
+        <div className="relative z-10 flex-1 flex flex-col p-6 overflow-y-auto">
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col items-center justify-center text-neutral-500"
               >
-                <img 
-                  src={bossImage || "https://picsum.photos/id/718/1080/1920"} 
-                  alt="Boss" 
-                  className="w-full h-full object-cover"
+                <motion.img 
+                  animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  src="https://i.ibb.co/BVgY7XrT/babai.png"
+                  alt="Loading"
+                  className="w-48 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]"
                 />
-                {isBossDefeated && (
-                  <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
-                    <motion.div 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="text-white font-black text-4xl uppercase"
-                    >
-                      ПОБЕДА!
-                    </motion.div>
-                  </div>
-                )}
-              </div>
-
-              {isBossDefeated ? (
-                <div className="mt-8 text-center space-y-4">
-                  <p className="text-green-400 font-bold">Вы одолели босса и получили {storeConfig.bossRewardBase * Math.pow(storeConfig.bossRewardMultiplier, bossLevel - 1)} кг арбуза!</p>
-                  <button
-                    onClick={async () => {
-                      // Send boss defeat image to Telegram
-                      if (bossImage && tgId && !bossImage.includes("picsum.photos")) {
-                        saveImageToGallery(bossImage, tgId, `Победа над боссом ур. ${bossLevel}!`, undefined)
-                          .catch(console.error);
-                      }
-                      setIsBossBattle(false);
-                      const nextStage = stage + 1;
-                      setStage(nextStage);
-                      loadNextStage(nextStage);
-                    }}
-                    className="px-8 py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center gap-2"
-                  >
-                    ИДТИ ДАЛЬШЕ <ArrowRight size={18} />
-                  </button>
-                </div>
-              ) : (
-                <p className="mt-6 text-neutral-400 animate-pulse">ТАПАЙ ПО БОССУ!</p>
-              )}
-            </motion.div>
-          ) : isDanilChat ? (
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex flex-col"
-            >
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-800">
-                <div className="w-10 h-10 rounded-full bg-red-900 flex items-center justify-center font-bold text-xl">
-                  Д
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg">ДанИИл</h3>
-                  <p className="text-xs text-green-500">В сети</p>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-4 pb-4">
-                {chatMessages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-3 rounded-2xl ${msg.sender === "user" ? "bg-red-900 text-white rounded-tr-sm" : "bg-neutral-800 text-neutral-200 rounded-tl-sm"}`}
-                    >
-                      <p className="text-sm">{msg.text}</p>
-                    </div>
-                  </div>
-                ))}
-                {isDanilTyping && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[80%] p-3 rounded-2xl bg-neutral-800 text-neutral-400 rounded-tl-sm flex gap-1">
-                      <span className="animate-bounce">.</span>
-                      <span className="animate-bounce delay-100">.</span>
-                      <span className="animate-bounce delay-200">.</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {chatMessages.length > 0 &&
-              chatMessages[chatMessages.length - 1].sender === "danil" &&
-              chatMessages.length > 1 ? (
-                <button
-                  onClick={continueAfterChat}
-                  className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 mt-4"
-                >
-                  Продолжить путь <ArrowRight size={18} />
-                </button>
-              ) : (
-                <div className="flex gap-2 mt-4">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
-                    placeholder="Написать ДанИИлу..."
-                    className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-900 transition-colors"
-                  />
-                  <button
-                    onClick={handleSendChat}
-                    disabled={!chatInput.trim() || isDanilTyping}
-                    className="p-3 bg-red-700 hover:bg-red-600 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center"
-                  >
-                    <MessageSquare size={20} />
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          ) : isResultView ? (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex flex-col items-center justify-center text-center"
-            >
-              <div className={`text-2xl font-black mb-6 uppercase tracking-widest ${lastChoiceCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                {lastChoiceCorrect ? 'УСПЕХ' : 'ПРОВАЛ'}
-              </div>
-              <p className="text-lg md:text-xl leading-relaxed mb-12 italic font-serif">
-                {resultText}
-              </p>
-              <button
-                onClick={nextAfterResult}
-                className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-              >
-                ПРОДОЛЖИТЬ <ArrowRight size={18} />
-              </button>
-            </motion.div>
-          ) : scenario ? (
-            <motion.div
-              key="scenario"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="flex-1 flex flex-col"
-            >
-              <div className="flex-1 flex items-center justify-center py-8">
-                <p
-                  className="text-lg md:text-xl leading-relaxed font-medium text-center"
-                  style={{ fontFamily: "'Playfair Display', serif" }}
-                >
-                  {scenario.text}
+                <p className="text-sm uppercase tracking-widest text-red-500 animate-pulse font-bold">
+                  Генерация кошмара...
                 </p>
-              </div>
+              </motion.div>
+            ) : isBossBattle ? (
+              <motion.div
+                key="boss"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex-1 flex flex-col items-center justify-center"
+              >
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-black text-red-600 uppercase tracking-tighter mb-2">БИТВА С БОССОМ (УР. {bossLevel})</h3>
+                  <div className="flex gap-4 justify-center">
+                    <span className="text-yellow-500">ВРЕМЯ: {bossTimer}с</span>
+                    <span className="text-red-500">УДАРЫ: {bossTaps}/{100 * Math.pow(2, bossLevel - 1)}</span>
+                  </div>
+                </div>
 
-              <div className="space-y-3 mt-auto">
-                {scenario.options.map((opt, i) => (
+                <div 
+                  onClick={handleBossTap}
+                  className="relative w-64 h-64 md:w-80 md:h-80 rounded-3xl overflow-hidden border-4 border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.4)] cursor-pointer active:scale-95 transition-transform"
+                >
+                  <img 
+                    src={bossImage || "https://i.ibb.co/BVgY7XrT/babai.png"} 
+                    alt="Boss" 
+                    className="w-full h-full object-cover"
+                  />
+                  {isBossDefeated && (
+                    <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="text-white font-black text-4xl uppercase"
+                      >
+                        ПОБЕДА!
+                      </motion.div>
+                    </div>
+                  )}
+                </div>
+
+                {isBossDefeated ? (
+                  <div className="mt-8 text-center space-y-4">
+                    <p className="text-green-400 font-bold">Вы одолели босса и получили {storeConfig.bossRewardBase * Math.pow(storeConfig.bossRewardMultiplier, bossLevel - 1)} кг арбуза!</p>
+                    <button
+                      onClick={async () => {
+                        // Send boss defeat image to Telegram
+                        if (bossImage && tgId && !bossImage.includes("picsum.photos")) {
+                          saveImageToGallery(bossImage, tgId, `[bosses] Победа над боссом ур. ${bossLevel}!`, undefined)
+                            .catch(console.error);
+                        }
+                        setIsBossBattle(false);
+                        // After boss - continue to next regular stage (skip straight back to game flow)
+                        const nextStage = stage + 1;
+                        setStage(nextStage);
+                        if (nextStage > maxStages) {
+                          setIsGameOver(true);
+                        } else {
+                          loadNextStage(nextStage);
+                        }
+                      }}
+                      className="px-8 py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center gap-2"
+                    >
+                      ИДТИ ДАЛЬШЕ <ArrowRight size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-6 text-neutral-400 animate-pulse">ТАПАЙ ПО БОССУ!</p>
+                )}
+              </motion.div>
+            ) : isDanilChat ? (
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="flex-1 flex flex-col"
+              >
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-800">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border border-red-900">
+                    <img src={danIIlAvatar} alt="ДанИИл" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">ДанИИл</h3>
+                    <p className="text-xs text-green-500">В сети</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+                  {chatMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[80%] p-3 rounded-2xl ${msg.sender === "user" ? "bg-red-900 text-white rounded-tr-sm" : "bg-neutral-800 text-neutral-200 rounded-tl-sm"}`}
+                      >
+                        <p className="text-sm">{msg.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {isDanilTyping && (
+                    <div className="flex justify-start">
+                      <div className="max-w-[80%] p-3 rounded-2xl bg-neutral-800 text-neutral-400 rounded-tl-sm flex gap-1">
+                        <span className="animate-bounce">.</span>
+                        <span className="animate-bounce delay-100">.</span>
+                        <span className="animate-bounce delay-200">.</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {chatMessages.length > 0 &&
+                chatMessages[chatMessages.length - 1].sender === "danil" &&
+                chatMessages.length > 1 ? (
                   <button
-                    key={i}
-                    onClick={() => handleOptionSelect(i)}
-                    className="w-full p-4 bg-neutral-900/80 backdrop-blur-md border border-neutral-800 hover:border-red-900 rounded-2xl text-left transition-all active:scale-95 text-sm md:text-base font-medium lightning-btn"
+                    onClick={continueAfterChat}
+                    className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 mt-4"
                   >
-                    {opt}
+                    Продолжить путь <ArrowRight size={18} />
                   </button>
-                ))}
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
+                ) : (
+                  <div className="flex gap-2 mt-4">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+                      placeholder="Написать ДанИИлу..."
+                      className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-900 transition-colors"
+                    />
+                    <button
+                      onClick={handleSendChat}
+                      disabled={!chatInput.trim() || isDanilTyping}
+                      className="p-3 bg-red-700 hover:bg-red-600 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center"
+                    >
+                      <MessageSquare size={20} />
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            ) : isResultView ? (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="flex-1 flex flex-col items-center justify-center text-center"
+              >
+                <div className={`text-2xl font-black mb-6 uppercase tracking-widest ${lastChoiceCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                  {lastChoiceCorrect ? 'УСПЕХ' : 'ПРОВАЛ'}
+                </div>
+                <p className="text-lg md:text-xl leading-relaxed mb-12 italic font-serif">
+                  {resultText}
+                </p>
+                <button
+                  onClick={nextAfterResult}
+                  className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                >
+                  ПРОДОЛЖИТЬ <ArrowRight size={18} />
+                </button>
+              </motion.div>
+            ) : scenario ? (
+              <motion.div
+                key="scenario"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex-1 flex flex-col"
+              >
+                <div className="flex-1 flex items-center justify-center py-8">
+                  <p
+                    className="text-lg md:text-xl leading-relaxed font-medium text-center"
+                    style={{ fontFamily: "'Playfair Display', serif" }}
+                  >
+                    {scenario.text}
+                  </p>
+                </div>
+
+                <div className="space-y-3 mt-auto">
+                  {scenario.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleOptionSelect(i)}
+                      className="w-full p-4 bg-neutral-900/80 backdrop-blur-md border border-neutral-800 hover:border-red-900 rounded-2xl text-left transition-all active:scale-95 text-sm md:text-base font-medium lightning-btn"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
