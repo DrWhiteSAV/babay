@@ -63,6 +63,12 @@ export default function CharacterCreate() {
   const [generatedLore, setGeneratedLore] = useState<string>("");
   const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string>("");
 
+  // Lock flags — once generated, cannot re-generate
+  const [nameLocked, setNameLocked] = useState(false);
+  const [loreLocked, setLoreLocked] = useState(false);
+  const [avatarLocked, setAvatarLocked] = useState(false);
+  const [nameHasDuplicate, setNameHasDuplicate] = useState(false);
+
   const [isGeneratingName, setIsGeneratingName] = useState(false);
   const [isGeneratingLore, setIsGeneratingLore] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
@@ -77,8 +83,29 @@ export default function CharacterCreate() {
     else if (wishes.length < 4) setWishes([...wishes, wish]);
   };
 
-  // STEP 1: Gender selected → generate name immediately
+  // Check if name already exists in DB, return unique name (add number suffix if needed)
+  const ensureUniqueName = async (baseName: string): Promise<{ finalName: string; isDuplicate: boolean }> => {
+    try {
+      const { data } = await supabase
+        .from("player_stats")
+        .select("character_name")
+        .ilike("character_name", `${baseName}%`);
+      const existing = (data || []).map(r => r.character_name?.toLowerCase());
+      if (!existing.includes(baseName.toLowerCase())) {
+        return { finalName: baseName, isDuplicate: false };
+      }
+      // Find next available number
+      let i = 2;
+      while (existing.includes(`${baseName.toLowerCase()}${i}`)) i++;
+      return { finalName: `${baseName}${i}`, isDuplicate: true };
+    } catch {
+      return { finalName: baseName, isDuplicate: false };
+    }
+  };
+
+  // STEP 1: Gender selected → generate name immediately (LOCKED after first generation)
   const handleGenderSelect = async (g: Gender) => {
+    if (nameLocked) return; // Already generated, don't redo
     setGender(g);
     setStep(2);
     setIsGeneratingName(true);
@@ -91,21 +118,26 @@ export default function CharacterCreate() {
         .replace(/^[-*•]\s*/, "")
         .replace(/["""«»]/g, "")
         .trim();
-      setGeneratedName(cleaned || (g === "Бабай" ? "Бурьяник" : "Тьмарица"));
-      console.log(`[Create] name set: "${cleaned}"`);
+      const baseName = cleaned || (g === "Бабай" ? "Бурьяник" : "Тьмарица");
+      const { finalName, isDuplicate } = await ensureUniqueName(baseName);
+      setGeneratedName(finalName);
+      setNameHasDuplicate(isDuplicate);
+      setNameLocked(true); // Lock after first generation
     } catch (e) {
       console.error("[Create] name gen error:", e);
       setGeneratedName(g === "Бабай" ? "Бурьяник" : "Тьмарица");
+      setNameLocked(true);
     } finally {
       setIsGeneratingName(false);
     }
   };
 
+  // Only allow regeneration if name contains a number (was a duplicate)
   const handleRegenerateName = async () => {
-    if (!gender || isGeneratingName) return;
+    if (!gender || isGeneratingName || !nameHasDuplicate) return;
     setIsGeneratingName(true);
     try {
-      const prompt = `Придумай одно уникальное необычное имя для ${gender === "Бабай" ? "мужского" : "женского"} духа-Бабая. Имя должно быть оригинальным, ни одно другое такое не существует. Жутковатое и смешное. Только одно-два слова. Верни ТОЛЬКО само имя.`;
+      const prompt = `Придумай одно уникальное необычное имя для ${gender === "Бабай" ? "мужского" : "женского"} духа-Бабая. Имя должно быть оригинальным. Жутковатое и смешное. Только одно-два слова. Верни ТОЛЬКО само имя.`;
       const data = await callProtalk("text", prompt, tgId);
       const raw = data.text || "";
       const cleaned = raw.split("\n")[0]
@@ -113,7 +145,11 @@ export default function CharacterCreate() {
         .replace(/^[-*•]\s*/, "")
         .replace(/["""«»]/g, "")
         .trim();
-      if (cleaned) setGeneratedName(cleaned);
+      if (cleaned) {
+        const { finalName, isDuplicate } = await ensureUniqueName(cleaned);
+        setGeneratedName(finalName);
+        setNameHasDuplicate(isDuplicate);
+      }
     } catch (e) {
       console.error("[Create] name regen error:", e);
     } finally {
@@ -121,35 +157,34 @@ export default function CharacterCreate() {
     }
   };
 
-  // STEP 2: Style selected → generate lore
+  // STEP 2: Style selected → generate lore (LOCKED after first generation)
   const handleStyleSelect = async (s: Style) => {
     setStyle(s);
-    if (!gender) return;
+    if (!gender || loreLocked) return; // Lock after first style selection
     setIsGeneratingLore(true);
     try {
       const name = generatedName || (gender === "Бабай" ? "Бурьяник" : "Тьмарица");
       const prompt = `Напиши короткую историю происхождения (3-4 предложения) для духа-Бабая по имени ${name}, пол: ${gender}, визуальный стиль мира: ${s}. История должна быть атмосферной, жуткой и немного абсурдной. Верни только текст истории без заголовков.`;
-      console.log(`[Create] generating lore for "${name}" style="${s}"`);
       const data = await callProtalk("text", prompt, tgId);
       const lore = (data.text || "").trim();
       setGeneratedLore(lore);
-      console.log(`[Create] lore set: "${lore.substring(0, 80)}..."`);
+      setLoreLocked(true); // Lock after first generation
     } catch (e) {
       console.error("[Create] lore gen error:", e);
       setGeneratedLore("");
+      setLoreLocked(true);
     } finally {
       setIsGeneratingLore(false);
     }
   };
 
-  // STEP 3: Generate avatar using name + style + wishes + lore
+  // STEP 3: Generate avatar (LOCKED after first successful generation)
   const handleGenerateAvatar = async () => {
-    if (!gender || !style || isGeneratingAvatar) return;
+    if (!gender || !style || isGeneratingAvatar || avatarLocked) return;
     setIsGeneratingAvatar(true);
     setAvatarStatus("generating");
     setGeneratedAvatarUrl("");
     setSelectedDefaultImage(null);
-    // Scroll to top so user sees the loading state
     window.scrollTo({ top: 0, behavior: "smooth" });
 
     const name = generatedName || "Бабай";
@@ -157,44 +192,33 @@ export default function CharacterCreate() {
     const loreSnippet = generatedLore ? ` Лор персонажа: ${generatedLore.substring(0, 200)}.` : "";
     const prompt = `Нарисуй детализированный портрет духа-пугала по имени ${name} (${gender}). Одежда: старая пижама в полоску. Внешность: страшная но смешная, длинный язык больше метра, безумный взгляд. Особые приметы: ${wishesStr}. Художественный стиль: ${style}.${loreSnippet} Высокое качество, атмосферный портрет, тёмный фон.`;
 
-    console.log(`[Create] generating avatar: tgId=${tgId}, name="${name}", style="${style}", wishes="${wishesStr}", lore="${loreSnippet.substring(0, 60)}"`);
-
     try {
       const data = await callProtalk("image", prompt, tgId);
       const rawUrl = data.imageUrl || null;
-      console.log(`[Create] got rawUrl from ProTalk: ${rawUrl}`);
 
       if (!rawUrl || !rawUrl.startsWith("http")) {
-        console.warn("[Create] no valid imageUrl from ProTalk");
         setAvatarStatus("idle");
         return;
       }
 
-      // Save to Supabase Storage + Telegram + gallery
       setAvatarStatus("uploading");
-      console.log(`[Create] saving to storage & telegram via save-to-gallery`);
-
       const galResp = await fetch(`${SUPABASE_URL}/functions/v1/save-to-gallery`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({
           imageUrl: rawUrl,
           telegramId: tgId,
-          label: `Аватар: ${name}`,
+          label: `[avatars] Аватар: ${name}`,
           prompt,
           lore: generatedLore || null,
         }),
       });
 
       const galData = await galResp.json();
-      console.log(`[Create] save-to-gallery result: success=${galData.success}, storage_url=${galData.storage_url}`);
-
       const finalUrl = galData.storage_url || galData.gallery_item?.image_url || rawUrl;
       setGeneratedAvatarUrl(finalUrl);
       setAvatarStatus("done");
+      setAvatarLocked(true); // Lock after successful generation
     } catch (e) {
       console.error("[Create] avatar generation failed:", e);
       setAvatarStatus("idle");
@@ -309,15 +333,21 @@ export default function CharacterCreate() {
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <p className="text-2xl font-black text-red-400">{generatedName}</p>
-                  <button
-                    onClick={handleRegenerateName}
-                    disabled={isGeneratingName}
-                    className="p-2 rounded-xl border border-neutral-700 hover:border-red-600 hover:bg-red-900/20 text-neutral-400 hover:text-red-400 transition-all disabled:opacity-40"
-                    title="Перегенерировать имя"
-                  >
-                    <RefreshCw size={16} />
-                  </button>
+                  <div>
+                    <p className="text-2xl font-black text-red-400">{generatedName}</p>
+                    {nameHasDuplicate && <p className="text-xs text-yellow-500 mt-1">Имя уже занято — добавлен номер</p>}
+                  </div>
+                  {/* Only show regenerate if name has a duplicate number */}
+                  {nameHasDuplicate && (
+                    <button
+                      onClick={handleRegenerateName}
+                      disabled={isGeneratingName}
+                      className="p-2 rounded-xl border border-neutral-700 hover:border-red-600 hover:bg-red-900/20 text-neutral-400 hover:text-red-400 transition-all disabled:opacity-40"
+                      title="Перегенерировать имя (занято)"
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -443,20 +473,22 @@ export default function CharacterCreate() {
                 ) : null}
               </AnimatePresence>
 
-              {!selectedDefaultImage && (
+              {!selectedDefaultImage && !avatarLocked && (
                 <button
                   onClick={handleGenerateAvatar}
                   disabled={isGeneratingAvatar}
                   className="w-full py-3 border border-red-700 bg-red-900/20 hover:bg-red-900/40 text-red-300 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait mb-4"
                 >
                   {isGeneratingAvatar
-                    ? <><Loader2 size={16} className="animate-spin" /> {
-                        avatarStatus === "uploading" ? "Сохраняем..." :
-                        "Генерируем..."
-                      }</>
-                    : <><Sparkles size={16} /> {generatedAvatarUrl ? "Перегенерировать аватар" : "Сгенерировать аватар ИИ"}</>
+                    ? <><Loader2 size={16} className="animate-spin" /> {avatarStatus === "uploading" ? "Сохраняем..." : "Генерируем..."}</>
+                    : <><Sparkles size={16} /> Сгенерировать аватар ИИ</>
                   }
                 </button>
+              )}
+              {avatarLocked && generatedAvatarUrl && (
+                <div className="w-full py-2 text-center text-xs text-green-500 mb-4">
+                  ✓ Аватар создан и сохранён. Повторная генерация недоступна.
+                </div>
               )}
 
               <p className="text-xs text-neutral-500 mb-3 text-center">— или выбери готовый —</p>
