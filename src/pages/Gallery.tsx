@@ -36,10 +36,7 @@ export default function Gallery() {
           .eq("telegram_id", tgId)
           .order("created_at", { ascending: false });
         if (error) console.error("[Gallery] load error:", error);
-        if (data) {
-          console.log("[Gallery] loaded items:", data.length, data.map(d => d.label));
-          setItems(data);
-        }
+        if (data) setItems(data);
       }
       setLoading(false);
     };
@@ -47,11 +44,11 @@ export default function Gallery() {
   }, [profile?.telegram_id]);
 
   const getCategory = (item: GalleryItem): Section => {
-    const label = (item.label || "").toLowerCase();
+    const label = item.label?.toLowerCase() || "";
     if (label.includes("[avatars]") || label.includes("аватар")) return "avatars";
     if (label.includes("[backgrounds]") || label.includes("фон")) return "backgrounds";
     if (label.includes("[bosses]") || label.includes("босс")) return "bosses";
-    return "avatars"; // Default uncategorized items to avatars (most likely case)
+    return "all";
   };
 
   const filteredItems = activeSection === "all"
@@ -65,15 +62,9 @@ export default function Gallery() {
     { key: "bosses", label: "Боссы", icon: <Skull size={14} /> },
   ];
 
-  const handleSetAsAvatar = async () => {
+  const handleSetAsAvatar = () => {
     if (!selectedImage || !character) return;
     updateCharacter({ avatarUrl: selectedImage.image_url });
-    // Also update in DB
-    if (profile?.telegram_id) {
-      await supabase.from("player_stats")
-        .update({ avatar_url: selectedImage.image_url })
-        .eq("telegram_id", profile.telegram_id);
-    }
     alert("Аватар обновлён!");
     setSelectedImage(null);
   };
@@ -160,6 +151,7 @@ export default function Gallery() {
                     {item.label.replace(/^\[(avatars|backgrounds|bosses)\]\s*/i, "")}
                   </div>
                 )}
+                {/* Category badge */}
                 <div className="absolute top-2 left-2">
                   {getCategory(item) === "avatars" && <span className="bg-purple-900/80 text-purple-300 text-[9px] px-1.5 py-0.5 rounded-full font-bold">АВАТАР</span>}
                   {getCategory(item) === "backgrounds" && <span className="bg-blue-900/80 text-blue-300 text-[9px] px-1.5 py-0.5 rounded-full font-bold">ФОН</span>}
@@ -205,7 +197,8 @@ export default function Gallery() {
                 </p>
               )}
               <div className="mt-3 flex justify-center gap-2 flex-wrap">
-                {(getCategory(selectedImage) === "avatars") && character && (
+                {/* Set as avatar button for avatar-type images */}
+                {(getCategory(selectedImage) === "avatars" || getCategory(selectedImage) === "all") && character && (
                   <button
                     onClick={handleSetAsAvatar}
                     className="flex items-center gap-2 px-4 py-2 bg-purple-800 hover:bg-purple-700 text-white rounded-full transition-colors text-sm font-medium"

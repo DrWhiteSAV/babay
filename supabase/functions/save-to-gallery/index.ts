@@ -7,13 +7,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Upload image to ImgBB and return direct URL */
 async function uploadToImgbb(imageBlob: Blob): Promise<string | null> {
   const IMGBB_KEY = Deno.env.get("IMGBB_API_KEY");
   if (!IMGBB_KEY) {
-    console.warn("[save-to-gallery] IMGBB_API_KEY not set");
+    console.warn("[save-to-gallery] IMGBB_API_KEY not set, skipping ImgBB upload");
     return null;
   }
   try {
+    // Convert blob to base64
     const arrayBuffer = await imageBlob.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
     let binary = "";
@@ -24,7 +26,10 @@ async function uploadToImgbb(imageBlob: Blob): Promise<string | null> {
     form.append("key", IMGBB_KEY);
     form.append("image", base64);
 
-    const resp = await fetch("https://api.imgbb.com/1/upload", { method: "POST", body: form });
+    const resp = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      body: form,
+    });
     const data = await resp.json();
     if (data.success && data.data?.url) {
       console.log(`[save-to-gallery] ImgBB url: ${data.data.url}`);
@@ -71,38 +76,38 @@ serve(async (req) => {
       photoBlob = await imgResp.blob();
     }
 
-    // 2. Upload to ImgBB
+    // 2. Upload to ImgBB — primary stable URL for profiles & gallery
     const imgbbUrl = await uploadToImgbb(photoBlob);
 
-    // 3. Fallback to Supabase Storage
+    // 3. Fallback to Supabase Storage if ImgBB fails
     let storageUrl: string | null = null;
     if (!imgbbUrl) {
       const fileName = `${telegramId}/${Date.now()}.png`;
+      console.log(`[save-to-gallery] falling back to supabase storage: avatars/${fileName}`);
       const { error: storageError } = await supabase.storage
         .from("avatars")
         .upload(fileName, photoBlob, { contentType: "image/png", upsert: false });
       if (!storageError) {
         const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
         storageUrl = publicUrlData?.publicUrl || null;
+      } else {
+        console.error("[save-to-gallery] storage upload error:", storageError);
       }
     }
 
     const finalUrl = imgbbUrl || storageUrl || imageUrl;
     console.log(`[save-to-gallery] finalUrl: ${finalUrl}`);
 
-    // 4. Update player_stats avatar_url if this is an avatar image
-    // Check for [avatars] prefix OR "Аватар" anywhere in label
-    const labelLower = (label || "").toLowerCase();
-    if (labelLower.includes("[avatars]") || labelLower.includes("аватар") || labelLower.includes("avatar")) {
+    // 4. Update player_stats avatar_url
+    if (label?.startsWith("Аватар:") || label?.startsWith("Avatar:")) {
       const { error: statsError } = await supabase
         .from("player_stats")
         .update({ avatar_url: finalUrl })
         .eq("telegram_id", telegramId);
       if (statsError) console.error("[save-to-gallery] player_stats update error:", statsError);
-      else console.log("[save-to-gallery] Updated player_stats avatar_url");
     }
 
-    // 5. Save to gallery table
+    // 5. Save to gallery table (always)
     const { data, error } = await supabase
       .from("gallery")
       .insert({
@@ -114,13 +119,16 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (error) console.error("[save-to-gallery] gallery insert error:", error);
+    if (error) {
+      console.error("[save-to-gallery] gallery insert error:", error);
+      // Don't fail entirely — still send TG message
+    }
 
-    // 6. Send to Telegram
+    // 6. Send to Telegram (non-blocking — don't fail if missing token)
     if (BOT_TOKEN) {
       const caption = lore
-        ? `🧟 *${(label || "Аватар Бабая").replace(/^\[.*?\]\s*/, "")}*\n\n${lore.substring(0, 900)}`
-        : `🖼 ${(label || "Бабай").replace(/^\[.*?\]\s*/, "")}`;
+        ? `🧟 *${label || "Аватар Бабая"}*\n\n${lore.substring(0, 900)}`
+        : `🖼 ${label || "Бабай"}`;
 
       const formData = new FormData();
       formData.append("chat_id", telegramId.toString());
@@ -134,8 +142,12 @@ serve(async (req) => {
       });
       const tgData = await tgResp.json();
       console.log(`[save-to-gallery] telegram sendPhoto ok=${tgData.ok}`);
+      if (!tgData.ok) console.error("[save-to-gallery] TG error:", JSON.stringify(tgData));
+    } else {
+      console.warn("[save-to-gallery] TELEGRAM_BOT_TOKEN not set — skipping TG delivery");
     }
 
+    console.log(`[save-to-gallery] done! finalUrl=${finalUrl}`);
     return new Response(JSON.stringify({
       success: true,
       gallery_item: data || { image_url: finalUrl },

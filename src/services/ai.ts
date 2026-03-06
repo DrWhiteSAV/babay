@@ -4,6 +4,7 @@ import { supabase } from "../integrations/supabase/client";
 const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
 
+// Load AI settings for a section from Supabase
 async function loadAISettings(sectionId: string): Promise<{ service: string; prompt: string } | null> {
   try {
     const { data } = await supabase
@@ -17,10 +18,12 @@ async function loadAISettings(sectionId: string): Promise<{ service: string; pro
   }
 }
 
+// Replace macros in prompt with actual player data
 function applyMacros(prompt: string, data: Record<string, string>): string {
   return prompt.replace(/\{(\w+)\}/g, (_, key) => data[key] ?? `{${key}}`);
 }
 
+// Direct ProTalk call — always works, hardcoded URL
 async function callProTalkDirect(
   type: "text" | "image",
   prompt: string,
@@ -45,6 +48,7 @@ async function callProTalkDirect(
   return { text: data.text || "", imageUrl: data.imageUrl };
 }
 
+// Call AI (text or image) via ProTalk
 async function callAI(
   service: string,
   prompt: string,
@@ -67,9 +71,7 @@ export async function generateCharacterName(
     const settings = await loadAISettings("names");
     const basePrompt =
       settings?.prompt ||
-      `Придумай одно уникальное, жутковатое и немного абсурдное имя для славянского духа-Бабая. Пол: {gender}. Стиль: {style}. 
-Формат: необычное имя + прилагательное. Например: "Дзяка Мокрая", "Журон Подвальный", "Хрыпач Чердачный", "Кряхта Ржавая", "Бурчала Трубная", "Скрыпач Ночной", "Гнилозуб Батарейный", "Хлюпа Канализационная". 
-Имя должно быть необычным, звучать по-славянски, вызывать одновременно страх и усмешку. Никаких обычных имен. Никаких слов "Пижама", "Бабай", "Дух". Верни ТОЛЬКО имя (2 слова), без пояснений, кавычек, нумерации.`;
+      "Сгенерируй одно уникальное, забавное имя для славянского кибернетического духа-Бабая. Пол: {gender}. Стиль: {style}. Имя должно состоять из одного или двух слов. Верни ТОЛЬКО само имя, без нумерации, без пояснений, без кавычек.";
     const prompt = applyMacros(basePrompt, { gender, style });
     const service = settings?.service || "protalk-text";
     const { text } = await callAI(service, prompt, telegramId);
@@ -82,7 +84,7 @@ export async function generateCharacterName(
     return cleaned || "Безымянный";
   } catch (e) {
     console.error("[AI] Name gen error:", e);
-    const names = ["Хрыпач Чердачный", "Кряхта Ржавая", "Бурчала Трубная", "Скрыпач Ночной", "Гнилозуб Батарейный"];
+    const names = ["Тьмарь", "Жуткий", "Скрежет", "Хладень", "Бурьян", "Крипень"];
     return names[Math.floor(Math.random() * names.length)];
   }
 }
@@ -99,7 +101,7 @@ export async function generateAvatar(
   const loreSnippet = extraData?.lore ? ` Лор персонажа: ${extraData.lore.substring(0, 200)}.` : "";
   const basePrompt =
     settings?.prompt ||
-    "Нарисуй горизонтальный детализированный портрет славянского духа-пугала по имени {name} ({gender}). Одежда: старая пижама. Внешность: страшная и смешная, длинный язык больше метра. Стиль: {style}. Дополнительно: {wishes}.{lore_snippet} Высокое качество, атмосферный, горизонтальная ориентация изображения.";
+    "Нарисуй портрет славянского кибернетического духа по имени {name} ({gender}). Наряд: пижама. Внешность: страшная и смешная, длинный язык больше метра. Стиль: {style}. Дополнительно: {wishes}.{lore_snippet} Высокое качество, детализированный, атмосферный.";
   const prompt = applyMacros(basePrompt, {
     gender,
     style,
@@ -131,13 +133,12 @@ export async function generateAvatarWithItem(
     const service = settings?.service || "protalk-image";
     const basePrompt =
       settings?.prompt ||
-      "Обнови горизонтальный портрет славянского духа по имени {name} ({gender}), стиль: {style}. Текущий аватар: {avatar_url}. Лор: {lore}. Ранее купленные предметы: {inventory}. НОВЫЙ предмет: {new_item}. Нарисуй обновлённый портрет с новым предметом. Особые приметы: {wishes}. Горизонтальная ориентация. Высокое качество.";
+      "Обнови внешность славянского духа по имени {name} ({gender}), стиль: {style}. Текущий аватар: {avatar_url}. Ранее купленные предметы: {inventory}. НОВЫЙ предмет: {new_item}. Нарисуй обновлённый портрет с новым предметом. Особые приметы: {wishes}. Высокое качество.";
     const prompt = applyMacros(basePrompt, {
       name: character.name || "",
       gender: character.gender || "",
       style: character.style || "",
       avatar_url: currentAvatar,
-      lore: character.lore || "",
       inventory: allOwnedItems.join(", "),
       new_item: newItemName,
       wishes: (character.wishes || []).join(", "),
@@ -196,10 +197,9 @@ export async function generateBackgroundImage(
 ): Promise<{ url: string; prompt: string }> {
   const settings = await loadAISettings("background");
   const service = settings?.service || "protalk-image";
-  const lore = characterData?.lore || "";
   const basePrompt =
     settings?.prompt ||
-    `Нарисуй горизонтальное атмосферное изображение: интерьер жуткого многоквартирного многоэтажного дома ночью. Вид изнутри подъезда или квартиры. Тёмные коридоры, облупленные стены, мерцающий свет. Стиль: {style}. Без людей, без текста, без надписей. Горизонтальная ориентация. Лор мира: ${lore.substring(0, 150)}. Высокое качество, детализация.`;
+    "Нарисуй атмосферный фон для игры ужасов в стиле {style}. Без людей, без текста. Тёмный заброшенный дом, ночь, туман.";
   const prompt = applyMacros(basePrompt, {
     style,
     stage: String(stage),
@@ -213,10 +213,10 @@ export async function generateBackgroundImage(
   try {
     const { imageUrl } = await callAI(service, prompt, telegramId);
     const url = imageUrl && imageUrl.startsWith("http") ? imageUrl : null;
-    return { url: url || "", prompt };
+    return { url: url || "https://picsum.photos/id/1015/1920/1080", prompt };
   } catch (e) {
     console.error("[AI] Background gen error:", e);
-    return { url: "", prompt };
+    return { url: "https://picsum.photos/id/1015/1920/1080", prompt };
   }
 }
 
@@ -228,10 +228,9 @@ export async function generateBossImage(
 ): Promise<{ url: string; prompt: string }> {
   const settings = await loadAISettings("boss");
   const service = settings?.service || "protalk-image";
-  const bgPromptHint = characterData?.bg_prompt || "жуткий многоэтажный дом ночью";
   const basePrompt =
     settings?.prompt ||
-    `Нарисуй горизонтальное изображение огромного ужасающего босса для славянской игры ужасов. Стиль: {style}. Уровень босса: {boss_level}. Фон: ${bgPromptHint}. Эпичный, детализированный, горизонтальная ориентация. Без текста, без надписей. Высокое качество.`;
+    "Нарисуй огромного ужасающего босса для славянской игры ужасов. Стиль: {style}. Уровень босса: {boss_level}. Эпичный, детализированный.";
   const prompt = applyMacros(basePrompt, {
     style,
     stage: String(stage),
@@ -243,10 +242,10 @@ export async function generateBossImage(
   try {
     const { imageUrl } = await callAI(service, prompt, telegramId);
     const url = imageUrl && imageUrl.startsWith("http") ? imageUrl : null;
-    return { url: url || "", prompt };
+    return { url: url || "https://picsum.photos/id/718/1920/1080", prompt };
   } catch (e) {
     console.error("[AI] Boss gen error:", e);
-    return { url: "", prompt };
+    return { url: "https://picsum.photos/id/718/1920/1080", prompt };
   }
 }
 
@@ -272,17 +271,19 @@ export async function generateFriendChat(
 
     const loreLine = character?.lore ? `\nЛор Бабая: ${character.lore}` : "";
 
+    let promptText = "";
     if (friendName === "ДанИИл") {
       const settings = await loadAISettings("chat");
       const service = settings?.service || "protalk-text";
       const basePrompt =
         settings?.prompt ||
-        "Ты ДанИИл, дух-начальник (ИИ), который контролирует Бабаев. Стиль: строгий, саркастичный, требует отчётов о выселении жильцов. Ты используешь технический жаргон и любишь называть всех по номерам.";
-      const promptText = `${basePrompt} Стиль мира: ${style}.${loreLine} Бабай по имени ${character?.name || "Неизвестный"} пишет: "${message}".${historyText} Ответь коротко (1-2 предложения) в характере ДанИИла.`;
+        "Ты ДанИИл, дух-начальник (ИИ), который контролирует Бабаев. Стиль: строгий, саркастичный, требует отчётов о выселении жильцов.";
+      promptText = `${basePrompt} Стиль мира: ${style}.${loreLine} Бабай по имени ${character?.name || "Неизвестный"} пишет: "${message}".${historyText} Ответь коротко (1-2 предложения).`;
       const { text } = await callAI(service, promptText, telegramId);
       return text.trim() || "Продолжай работать.";
     } else {
-      const promptText = `Ты — ИИ-заместитель друга по имени ${friendName}. Твой собеседник — Бабай ${character?.name || "Неизвестный"}.${loreLine} Стиль мира: ${style}. Игрок пишет: "${message}".${historyText} Ответь коротко (1-3 предложения).`;
+      // Friend AI — use lore as character context
+      promptText = `Ты — ИИ-заместитель друга по имени ${friendName}. Твой собеседник — Бабай ${character?.name || "Неизвестный"}.${loreLine} Стиль мира: ${style}. Игрок пишет: "${message}".${historyText} Ответь коротко (1-3 предложения).`;
       const { text } = await callAI("protalk-text", promptText, telegramId);
       return text.trim() || "Продолжай работать.";
     }
@@ -312,7 +313,7 @@ export async function generateLore(
     const service = settings?.service || "protalk-text";
     const basePrompt =
       settings?.prompt ||
-      `Напиши короткую (3-4 предложения) мистическую и абсурдную историю происхождения для духа-Бабая по имени {name} (это необычное имя с прилагательным). Пол: {gender}, стиль: {style}. Объясни, откуда взялось такое странное имя. История должна быть атмосферной, жуткой и немного абсурдной. Упомяни пижаму и длинный язык.`;
+      "Напиши короткую (3-4 предложения) мистическую историю происхождения для Бабая по имени {name}, пол: {gender}, стиль: {style}. Сделай историю атмосферной и жуткой.";
     const prompt = applyMacros(basePrompt, { name, gender, style, ...extraData });
     const { text } = await callAI(service, prompt, telegramId);
     return text.trim() || "";

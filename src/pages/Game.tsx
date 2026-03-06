@@ -161,7 +161,7 @@ export default function Game() {
     setExitedEarly(false);
     setPvpResults(null);
     setIsGameOver(false);
-    // No cutscene - go straight to world generation
+    setShowCutscene(true);
 
     // Set default background immediately from admin panel
     const defaultBg = getDefaultGameBg();
@@ -726,7 +726,7 @@ export default function Game() {
 
   return (
     <div className="flex-1 flex flex-col bg-transparent text-white relative">
-      {showCutscene && !isGeneratingWorld && <CutscenePlayer onComplete={() => setShowCutscene(false)} />}
+      {showCutscene && <CutscenePlayer onComplete={() => setShowCutscene(false)} />}
       <AnimatePresence>
         {showScreamer && (
           <motion.div
@@ -826,7 +826,7 @@ export default function Game() {
 
       {/* Main Content Area */}
       {!isGeneratingWorld && (
-        <div className="relative z-10 flex-1 flex flex-col p-6 overflow-y-auto pb-24">
+        <div className="relative z-10 flex-1 flex flex-col p-6 overflow-y-auto">
           <AnimatePresence mode="wait">
             {isLoading ? (
               <motion.div
