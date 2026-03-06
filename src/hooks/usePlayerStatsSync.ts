@@ -3,10 +3,9 @@ import { usePlayerStore } from "../store/playerStore";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 
-/**
- * Loads player stats from Supabase on mount (to restore progress),
- * then syncs stats back to Supabase whenever they change.
- */
+const DEFAULT_FONT_SIZE = 12;
+const DEFAULT_BUTTON_SIZE = "small";
+
 export function usePlayerStatsSync() {
   const store = usePlayerStore();
   const { profile } = useTelegram();
@@ -26,7 +25,7 @@ export function usePlayerStatsSync() {
 
       const state = usePlayerStore.getState();
 
-      // Restore numeric stats only if DB has higher values (avoid overwriting fresh session)
+      // Restore numeric stats only if DB has higher values
       if (data.fear > state.fear) store.addFear(data.fear - state.fear);
       if (data.energy > state.energy) store.addEnergy(data.energy - state.energy);
       if (data.watermelons > state.watermelons) store.addWatermelons(data.watermelons - state.watermelons);
@@ -46,26 +45,33 @@ export function usePlayerStatsSync() {
         store.updateCharacter({ lore: data.lore });
       }
 
-      // Restore settings
+      // Restore avatar URL from DB if it's an imgbb link (more reliable)
+      if (state.character && data.avatar_url && data.avatar_url.includes("i.ibb.co")) {
+        if (state.character.avatarUrl !== data.avatar_url) {
+          store.updateCharacter({ avatarUrl: data.avatar_url });
+        }
+      }
+
+      // Restore settings from DB - only override if DB has explicitly saved values
       if (data.custom_settings && typeof data.custom_settings === "object") {
         const cs = data.custom_settings as any;
-        if (cs.buttonSize || cs.fontFamily || cs.theme) {
-          store.updateSettings({
-            ...(cs.buttonSize && { buttonSize: cs.buttonSize }),
-            ...(cs.fontFamily && { fontFamily: cs.fontFamily }),
-            ...(cs.fontSize && { fontSize: cs.fontSize }),
-            ...(cs.fontBrightness && { fontBrightness: cs.fontBrightness }),
-            ...(cs.theme && { theme: cs.theme }),
-            ...(cs.musicVolume !== undefined && { musicVolume: cs.musicVolume }),
-            ...(cs.ttsEnabled !== undefined && { ttsEnabled: cs.ttsEnabled }),
-          });
+        // Only apply settings if they exist in DB custom_settings
+        const settingsUpdate: Record<string, any> = {};
+        if (cs.buttonSize !== undefined) settingsUpdate.buttonSize = cs.buttonSize;
+        if (cs.fontFamily !== undefined) settingsUpdate.fontFamily = cs.fontFamily;
+        if (cs.fontSize !== undefined) settingsUpdate.fontSize = cs.fontSize;
+        if (cs.fontBrightness !== undefined) settingsUpdate.fontBrightness = cs.fontBrightness;
+        if (cs.theme !== undefined) settingsUpdate.theme = cs.theme;
+        if (cs.musicVolume !== undefined) settingsUpdate.musicVolume = cs.musicVolume;
+        if (cs.ttsEnabled !== undefined) settingsUpdate.ttsEnabled = cs.ttsEnabled;
+        
+        if (Object.keys(settingsUpdate).length > 0) {
+          store.updateSettings(settingsUpdate);
         }
       }
     };
 
     loadStats();
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.telegram_id]);
 
   // Sync to Supabase on state changes (debounced)
@@ -103,7 +109,6 @@ export function usePlayerStatsSync() {
         .upsert(syncData, { onConflict: "telegram_id" });
       if (error) console.error("player_stats sync error:", error.message);
 
-      // Also update leaderboard_cache
       if (store.character) {
         await supabase.from("leaderboard_cache").upsert({
           telegram_id: profile.telegram_id,
