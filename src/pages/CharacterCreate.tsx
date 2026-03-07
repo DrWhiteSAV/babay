@@ -193,7 +193,8 @@ export default function CharacterCreate() {
     const name = generatedName || "Бабай";
     const wishesStr = wishes.length > 0 ? wishes.join(", ") : "обычная внешность";
     const loreSnippet = generatedLore ? ` Лор персонажа: ${generatedLore.substring(0, 200)}.` : "";
-    const prompt = `Нарисуй детализированный портрет духа-пугала по имени ${name} (${gender}). Одежда: старая пижама в полоску. Внешность: страшная но смешная, длинный язык больше метра, безумный взгляд. Особые приметы: ${wishesStr}. Художественный стиль: ${style}.${loreSnippet} Высокое качество, атмосферный портрет, тёмный фон.`;
+    const genderDesc = gender === "Бабай" ? "мужской" : "женский";
+    const prompt = `Нарисуй горизонтальный детализированный портрет славянского духа-пугала по имени ${name} (пол: ${genderDesc}). Внешность: страшная но смешная, длинный язык больше метра, безумный взгляд. Особые приметы: ${wishesStr}. Художественный стиль: ${style}.${loreSnippet} Горизонтальная ориентация. Высокое качество, атмосферный портрет, тёмный фон.`;
 
     try {
       const data = await callProtalk("image", prompt, tgId);

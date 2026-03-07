@@ -94,10 +94,14 @@ export default function Shop() {
         );
         
         if (rawUrl && rawUrl.startsWith("http")) {
-          // Upload to ImgBB via save-to-gallery
-          const finalUrl = await saveImageToGallery(rawUrl, profile?.telegram_id!, `[avatars] Аватар: ${character.name} + ${item.name}`, undefined) || rawUrl;
+          // Upload to ImgBB via save-to-gallery and save to DB gallery
+          const imgbbUrl = await saveImageToGallery(rawUrl, profile?.telegram_id!, `[avatars] Аватар: ${character.name} + ${item.name}`, undefined);
+          const finalUrl = imgbbUrl || rawUrl;
           updateCharacter({ avatarUrl: finalUrl });
-          addToGallery(finalUrl);
+          // Update avatar in player_stats DB too
+          if (profile?.telegram_id) {
+            supabase.from("player_stats").update({ avatar_url: finalUrl }).eq("telegram_id", profile.telegram_id).then();
+          }
           setAvatarEvolvePopup(prev => prev ? { ...prev, newAvatar: finalUrl, isGenerating: false } : null);
         } else {
           setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false } : null);
