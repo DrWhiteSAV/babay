@@ -210,22 +210,13 @@ export default function Game() {
         setBossImage(bResult.url);
         bossImageReadyRef.current = true;
         setBossImageReady(true);
-        // Save to gallery [bosses] — save-to-gallery handles ImgBB upload + DB insert with telegram_id
+        // Save to gallery [bosses] via saveImageToGallery (unified approach)
         const activeTgId = tgId ?? profile?.telegram_id;
         console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
-          const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-          const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-          fetch(`${SB_URL}/functions/v1/save-to-gallery`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SB_KEY}` },
-            body: JSON.stringify({
-              imageUrl: bResult.url,
-              telegramId: activeTgId,
-              label: `[bosses] Босс ур.${bossLevel}`,
-              prompt: bResult.prompt,
-            }),
-          }).then(r => r.json()).then(d => console.log("[Game] 📦 boss gallery save:", d.success ? "ok" : d.error)).catch(console.error);
+          saveImageToGallery(bResult.url, activeTgId, `[bosses] Босс ур.${bossLevel}`, bResult.prompt)
+            .then(saved => console.log("[Game] 📦 boss gallery save:", saved ? "ok" : "failed"))
+            .catch(console.error);
         } else {
           console.warn("[Game] ⚠️ no tgId — boss not saved to gallery");
         }
