@@ -548,9 +548,19 @@ export default function Friends() {
                         <span className="font-bold text-white text-sm truncate">{chat.name}</span>
                       )}
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
+                    <div className="flex gap-1.5 shrink-0 items-center">
                       <button onClick={() => handleEditGroup(chat.id, chat.name)} className="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-neutral-400 transition-colors"><Edit2 size={14} /></button>
-                      <button onClick={() => navigate("/chat", { state: { groupId: chat.id } })} className="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-blue-400 transition-colors"><MessageSquare size={14} /></button>
+                      <button
+                        onClick={() => navigate("/chat", { state: { groupId: chat.id } })}
+                        className="relative p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-blue-400 transition-colors"
+                      >
+                        <MessageSquare size={14} />
+                        {(perChatUnread[`group_${chat.id}`] || 0) > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none shadow-[0_0_6px_rgba(220,38,38,0.7)]">
+                            {perChatUnread[`group_${chat.id}`] > 99 ? "99+" : perChatUnread[`group_${chat.id}`]}
+                          </span>
+                        )}
+                      </button>
                       <button onClick={() => { if (confirm('Удалить группу?')) deleteGroupChat(chat.id); }} className="p-2 bg-neutral-800 hover:bg-red-900/50 rounded-lg text-red-500 transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
