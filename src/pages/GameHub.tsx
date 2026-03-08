@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import { usePlayerStore } from "../store/playerStore";
@@ -12,6 +12,7 @@ import {
   Skull,
   Users,
   Trophy,
+  Loader2,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 
@@ -19,8 +20,19 @@ import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 export default function GameHub() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { character, fear, energy, watermelons, globalBackgroundUrl, pageBackgrounds } = usePlayerStore();
+  const { character, dbLoaded, fear, energy, watermelons, globalBackgroundUrl, pageBackgrounds } = usePlayerStore();
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
+
+  // Show loader while DB is loading — don't redirect prematurely
+  if (!dbLoaded) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-500">
+        <Loader2 size={28} className="animate-spin text-red-700" />
+        <span className="text-sm">Загрузка духа...</span>
+      </div>
+    );
+  }
+
   if (!character) {
     navigate("/");
     return null;

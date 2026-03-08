@@ -253,11 +253,6 @@ export function usePlayerStatsSync() {
     if (!store.dbLoaded) return;       // Gate #1: wait for DB load
     if (!store.character) return;      // Gate #2: no character = nothing to sync
     if (store.gameStatus === "reset" || store.gameStatus === "loading" || store.gameStatus === "new") return; // Gate #3
-    // Gate #0: block writes for 5 seconds after DB load to prevent stale-store race writes
-    if (dbLoadedAtRef.current > 0 && Date.now() - dbLoadedAtRef.current < 5000) {
-      console.log("[usePlayerStatsSync] ⏳ write blocked — within 5s cooldown after DB load");
-      return;
-    }
 
     const currentAvatar = isHttpUrl(store.character.avatarUrl)
       ? store.character.avatarUrl
@@ -302,19 +297,31 @@ export function usePlayerStatsSync() {
     // Gate #5: nothing changed vs snapshot
     if (dbSnapshotRef.current === currentSnapshot) return;
 
-    // Real change detected — log diff
+    // Real change detected — log diff and schedule write
     const prevSnapshot = dbSnapshotRef.current;
     dbSnapshotRef.current = currentSnapshot;
     try {
       const prev = JSON.parse(prevSnapshot);
       const curr = syncData as Record<string, unknown>;
       const changed = Object.keys(curr).filter(k => JSON.stringify(prev[k]) !== JSON.stringify(curr[k]));
-      console.log("[usePlayerStatsSync] 📝 writing to DB for", store.character.name, "| changed:", changed);
+      console.log("[usePlayerStatsSync] 📝 change detected for", store.character.name, "| changed:", changed);
     } catch {
-      console.log("[usePlayerStatsSync] 📝 writing to DB for", store.character.name);
+      console.log("[usePlayerStatsSync] 📝 change detected for", store.character.name);
     }
 
+    // Capture refs for the timer closure
+    const telegramId = profile.telegram_id;
+    const dbLoadedAt = dbLoadedAtRef.current;
+
     const timer = setTimeout(async () => {
+      // Gate #0: check cooldown AT WRITE TIME (not at effect-fire time)
+      // This prevents writes that were queued during the 5s window after DB load
+      if (dbLoadedAt > 0 && Date.now() - dbLoadedAt < 5000) {
+        console.log("[usePlayerStatsSync] ⏳ write cancelled — within 5s cooldown after DB load");
+        return;
+      }
+
+      console.log("[usePlayerStatsSync] 💾 writing to DB for", syncData.character_name);
       const { error } = await supabase
         .from("player_stats")
         .upsert(syncData, { onConflict: "telegram_id" });
@@ -322,23 +329,22 @@ export function usePlayerStatsSync() {
 
       await supabase.from("leaderboard_cache").upsert(
         {
-          telegram_id: profile.telegram_id,
-          display_name: store.character?.name || "Безымянный",
-          fear: store.fear,
-          telekinesis_level: store.character?.telekinesisLevel || 1,
+          telegram_id: telegramId,
+          display_name: syncData.character_name || "Безымянный",
+          fear: syncData.fear,
+          telekinesis_level: syncData.telekinesis_level,
           avatar_url: currentAvatar || FALLBACK_AVATAR,
         },
         { onConflict: "telegram_id" }
       );
-    }, 1500);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [
     profile?.telegram_id,
     store.dbLoaded,
-    // ← energy/fear/watermelons NOT in deps: they change every second via updateEnergy
-    // and would fire constant writes. They are included in syncData payload and will
-    // be written when a real field (character, settings) triggers a sync.
+    // ← energy/fear/watermelons NOT in deps: change every second via updateEnergy
+    // Included in syncData payload, written when a real field triggers a sync.
     store.bossLevel,
     store.character?.telekinesisLevel,
     store.character?.name,
