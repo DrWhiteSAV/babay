@@ -256,6 +256,7 @@ export function usePlayerStatsSync() {
       // UPDATE only gameplay stats — custom_settings and identity fields are NOT touched here
       console.log(`[DB WRITE] 📝 player_stats UPDATE (gameplay only) for telegram_id=${telegramId}`, {
         fear: payload.fear,
+        energy: payload.energy,
         watermelons: payload.watermelons,
         boss_level: payload.boss_level,
         telekinesis_level: payload.telekinesis_level,
@@ -266,6 +267,7 @@ export function usePlayerStatsSync() {
         .from("player_stats")
         .update({
           fear: payload.fear,
+          energy: payload.energy,
           watermelons: payload.watermelons,
           boss_level: payload.boss_level,
           telekinesis_level: payload.telekinesis_level,
@@ -306,6 +308,7 @@ export function usePlayerStatsSync() {
     store.dbLoaded,
     store.gameStatus,
     store.fear,
+    store.energy,
     store.watermelons,
     store.bossLevel,
     store.character?.telekinesisLevel,
@@ -320,6 +323,7 @@ export function usePlayerStatsSync() {
 function buildGameplaySnapshot(store: ReturnType<typeof usePlayerStore.getState>): string {
   return JSON.stringify({
     fear: store.fear,
+    energy: store.energy,
     watermelons: store.watermelons,
     boss_level: store.bossLevel,
     telekinesis_level: store.character?.telekinesisLevel ?? 1,
