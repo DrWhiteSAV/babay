@@ -464,18 +464,24 @@ export default function Chat() {
     const userMessage = input.trim();
     const imageToSend = selectedImage;
     const currentReplyTo = replyToMsg?.id;
-    const newMsg: Message = { id: Date.now().toString(), sender: "user", text: userMessage, imageUrl: imageToSend || undefined, replyTo: currentReplyTo };
+    const tempId = `pending_user_${Date.now()}`;
+    const newMsg: Message = { id: tempId, sender: "user", text: userMessage, imageUrl: imageToSend || undefined, replyTo: currentReplyTo };
     setMessages(prev => [...prev, newMsg]);
     setInput("");
     setSelectedImage(null);
     setReplyToMsg(null);
     setShowMentions(false);
-    await saveMessageToDB(newMsg, 'user', character?.name || 'user');
+    // Save to DB and swap temp ID with real UUID to prevent realtime duplication
+    const dbId = await saveMessageToDB(newMsg, 'user', character?.name || 'user');
+    if (dbId) {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
+    }
     const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline);
     if (shouldUseAI) {
       const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-      setPendingRetry({ userMessage, imageToSend, replyToMsgId: newMsg.id, responder: friend!.name, recentMessages });
-      await doAiReply(userMessage, imageToSend, newMsg.id, friend!.name, recentMessages);
+      const realMsgId = dbId || tempId;
+      setPendingRetry({ userMessage, imageToSend, replyToMsgId: realMsgId, responder: friend!.name, recentMessages });
+      await doAiReply(userMessage, imageToSend, realMsgId, friend!.name, recentMessages);
     } else if (group) {
       const aiMembers = group.members.filter(m => friends.find(f => f.name === m)?.isAiEnabled);
       const mentionedAIs = aiMembers.filter(m => userMessage.includes(`@${m}`));
@@ -489,9 +495,10 @@ export default function Chat() {
       }
       if (responders.length > 0) {
         const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-        setPendingRetry({ userMessage, imageToSend, replyToMsgId: newMsg.id, responder: responders[0], recentMessages });
+        const realMsgId = dbId || tempId;
+        setPendingRetry({ userMessage, imageToSend, replyToMsgId: realMsgId, responder: responders[0], recentMessages });
         for (const responder of responders) {
-          await doAiReply(userMessage, imageToSend, newMsg.id, responder, recentMessages);
+          await doAiReply(userMessage, imageToSend, realMsgId, responder, recentMessages);
         }
       }
     }
