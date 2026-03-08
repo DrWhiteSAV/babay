@@ -228,35 +228,78 @@ export function usePlayerStatsSync() {
   }, [profile?.telegram_id]);
 
   // ─── SYNC TO DB (debounced, only after DB hydration) ──────────────────────
-  // CRITICAL: store.dbLoaded (Zustand state) is used — NOT a ref — so this
-  // effect correctly re-evaluates when dbLoaded transitions false→true.
-  // This prevents stale localStorage values from triggering a DB write.
-  //
-  // IMPORTANT: We use a ref to track if the CURRENT sync cycle has already
-  // done the initial load. This prevents the settings deps from firing the
-  // sync before DB data is in the store.
-  const syncAllowedRef = useRef(false);
+  // APPROACH: snapshot-based guard.
+  // After DB load, we take a JSON snapshot of all syncable fields.
+  // The sync effect only writes to DB if the current state DIFFERS from the snapshot.
+  // This is the only reliable way — refs + boolean flags have race conditions.
+  const dbSnapshotRef = useRef<string | null>(null);
 
-  // Reset sync permission whenever telegram_id changes (new user/session)
+  // Clear snapshot whenever user/session changes — forces fresh DB load
   useEffect(() => {
-    syncAllowedRef.current = false;
+    dbSnapshotRef.current = null;
+    console.log("[usePlayerStatsSync] snapshot cleared for new session");
   }, [profile?.telegram_id]);
 
   useEffect(() => {
     if (!profile?.telegram_id) return;
     if (!store.dbLoaded) return; // ← Gate #1: Wait for fresh DB load
     if (!store.character) return; // ← Gate #2: No character = nothing to sync
-    // Gate #3: Never write to DB if game_status is 'reset' or 'loading' or 'new'
+    // Gate #3: Never write to DB if game_status is blocked
     if (store.gameStatus === "reset" || store.gameStatus === "loading" || store.gameStatus === "new") return;
 
-    // Gate #4: First time dbLoaded becomes true — mark sync as allowed but skip
-    // this very first invocation to prevent writing DB-loaded values right back.
-    // On the NEXT change (user actually changes something), sync will fire normally.
-    if (!syncAllowedRef.current) {
-      syncAllowedRef.current = true;
-      console.log("[usePlayerStatsSync] DB loaded — sync armed, skipping initial write");
+    const currentAvatar = isHttpUrl(store.character.avatarUrl)
+      ? store.character.avatarUrl
+      : lastKnownAvatarUrl.current;
+
+    if (isHttpUrl(currentAvatar)) {
+      lastKnownAvatarUrl.current = currentAvatar;
+    }
+
+    // Build the payload we'd write
+    const syncData = {
+      telegram_id: profile.telegram_id,
+      fear: store.fear,
+      energy: store.energy,
+      watermelons: store.watermelons,
+      boss_level: store.bossLevel,
+      telekinesis_level: store.character.telekinesisLevel,
+      character_name: store.character.name,
+      character_gender: store.character.gender,
+      character_style: store.character.style,
+      avatar_url: currentAvatar || FALLBACK_AVATAR,
+      lore: store.character.lore || null,
+      game_status: "playing",
+      custom_settings: {
+        buttonSize: store.settings.buttonSize,
+        fontFamily: store.settings.fontFamily,
+        fontSize: store.settings.fontSize,
+        fontBrightness: store.settings.fontBrightness,
+        theme: store.settings.theme,
+        musicVolume: store.settings.musicVolume,
+        ttsEnabled: store.settings.ttsEnabled,
+        wishes: store.character.wishes,
+        inventory: store.inventory,
+      },
+    };
+
+    const currentSnapshot = JSON.stringify(syncData);
+
+    // Gate #4 (snapshot-based): If no snapshot yet — this is the FIRST fire after DB load.
+    // Save snapshot and skip write. On the NEXT fire, compare — only write if changed.
+    if (dbSnapshotRef.current === null) {
+      dbSnapshotRef.current = currentSnapshot;
+      console.log("[usePlayerStatsSync] DB snapshot saved — skipping initial write for", store.character.name);
       return;
     }
+
+    // Gate #5: Skip write if nothing actually changed vs DB snapshot
+    if (dbSnapshotRef.current === currentSnapshot) {
+      return;
+    }
+
+    // Something changed — update snapshot and schedule write
+    dbSnapshotRef.current = currentSnapshot;
+    console.log("[usePlayerStatsSync] State changed — writing to DB");
 
     const currentAvatar = isHttpUrl(store.character.avatarUrl)
       ? store.character.avatarUrl
