@@ -163,6 +163,7 @@ export default function AdminNotifications() {
   const [triggerOptions, setTriggerOptions] = useState<TriggerOption[]>([]);
   const [aiImproving, setAiImproving] = useState(false);
   const [showMacros, setShowMacros] = useState(false);
+  const msgRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [form, setForm] = useState({
     type: 'broadcast',
