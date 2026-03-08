@@ -229,7 +229,7 @@ export function usePlayerStatsSync() {
     boss_level: number;
     telekinesis_level: number;
   }
-  const writeGameplayToDB = useRef<(telegramId: number, payload: GameplayPayload) => Promise<void>>();
+  const writeGameplayToDB = useRef<(telegramId: number, payload: GameplayPayload) => Promise<void>>(async () => {});
   writeGameplayToDB.current = async (telegramId: number, payload: GameplayPayload) => {
     console.log(`[DB WRITE] ⚡ player_stats IMMEDIATE UPDATE for telegram_id=${telegramId}`, {
       fear: payload.fear,
