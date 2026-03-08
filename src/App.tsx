@@ -18,6 +18,7 @@ import { useAchievements } from "./hooks/useAchievements";
 import { usePlayerStatsSync } from "./hooks/usePlayerStatsSync";
 import { AssetPreloaderProvider } from "./components/AssetPreloader";
 import { useIncomingMessageNotifier } from "./hooks/useIncomingMessageNotifier";
+import { resolveUrl } from "./utils/cachedUrl";
 
 // Pages
 import Home from "./pages/Home";
