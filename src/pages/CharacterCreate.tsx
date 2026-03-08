@@ -126,6 +126,26 @@ export default function CharacterCreate() {
     else if (wishes.length < 4) setWishes([...wishes, wish]);
   };
 
+  // Check uniqueness against gallery labels (all users' avatar names)
+  const checkNameInGallery = async (name: string): Promise<boolean> => {
+    try {
+      const nameLower = name.toLowerCase();
+      const { data } = await supabase
+        .from("gallery")
+        .select("label")
+        .ilike("label", `%[avatars]%`);
+      if (!data) return false;
+      return data.some(r => {
+        if (!r.label) return false;
+        // Extract name part: "[avatars] Name | Lore" or "[avatars] Name"
+        const match = r.label.replace(/^\[avatars\]\s*/i, "").split("|")[0].trim().toLowerCase();
+        return match === nameLower;
+      });
+    } catch {
+      return false;
+    }
+  };
+
   const ensureUniqueName = async (baseName: string): Promise<{ finalName: string; isDuplicate: boolean }> => {
     try {
       const { data } = await supabase
@@ -133,7 +153,8 @@ export default function CharacterCreate() {
         .select("character_name")
         .ilike("character_name", `${baseName}%`);
       const existing = (data || []).map(r => r.character_name?.toLowerCase());
-      if (!existing.includes(baseName.toLowerCase())) {
+      const inGallery = await checkNameInGallery(baseName);
+      if (!existing.includes(baseName.toLowerCase()) && !inGallery) {
         return { finalName: baseName, isDuplicate: false };
       }
       let i = 2;
