@@ -170,19 +170,24 @@ export default function Game() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvpRoomId, pvpDiffParam, character]);
 
-  // PVP room: report finish to DB when game over
+  // PVP room: report finish to DB when game over, then navigate
+  const [pvpSaved, setPvpSaved] = useState(false);
   useEffect(() => {
-    if (!pvpRoomId || !tgId || !isGameOver) return;
-    // Use ref to get the latest localFear value — state closure may be stale
-    const score = localFearRef.current;
+    if (!pvpRoomId || !tgId || !isGameOver || pvpSaved) return;
+    // Mark saved immediately to prevent double-run
+    setPvpSaved(true);
+    // Read score from ref — state may be stale due to closure
+    const finalScore = localFearRef.current;
     const exited = exitedEarlyRef.current;
+    console.log(`[DB WRITE] 📝 PVP finish: tgId=${tgId}, room=${pvpRoomId}, score=${finalScore}, exited=${exited}`);
     (async () => {
-      // Update member status to finished
-      await supabase.from("pvp_room_members").update({
+      // Update member status to finished with final score
+      const { error } = await supabase.from("pvp_room_members").update({
         status: exited ? "timeout" : "finished",
-        score,
+        score: finalScore,
         finished_at: new Date().toISOString(),
       }).eq("room_id", pvpRoomId).eq("telegram_id", tgId);
+      console.log(`[DB WRITE] 📝 pvp_room_members update result:`, error ? `ERROR: ${error.message}` : "OK");
 
       // Check if this is the first finisher → set timer_ends_at
       const { data: roomData } = await supabase
@@ -202,9 +207,12 @@ export default function Game() {
       if (playingOrJoined.length === 0) {
         await supabase.from("pvp_rooms").update({ status: "finished" }).eq("id", pvpRoomId);
       }
+
+      // Navigate AFTER DB write completes
+      navigate(`/pvp/results/${pvpRoomId}`, { replace: true });
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGameOver, pvpRoomId, tgId]);
+  }, [isGameOver, pvpRoomId, tgId, pvpSaved]);
 
   // PVP results (old local sim — keep for non-room PVP legacy)
   useEffect(() => {
@@ -738,10 +746,13 @@ export default function Game() {
   // ======== SCREENS ========
 
   if (isGameOver) {
-    // PVP room mode → redirect to results page
+    // PVP room mode → show loading while DB write + redirect happen in useEffect
     if (pvpRoomId) {
-      navigate(`/pvp/results/${pvpRoomId}`, { replace: true });
-      return null;
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 size={32} className="animate-spin text-red-500" />
+        </div>
+      );
     }
     if (pvpParticipants.length > 0 && pvpResults) {
       const isWinner = pvpResults[0].isLocal && !exitedEarly;
