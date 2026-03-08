@@ -445,11 +445,12 @@ export default function Game() {
   };
 
   const startPvpGame = async (diff: Difficulty) => {
-    const cost = diff === "Сложная" ? 1 : diff === "Невозможная" ? 5 : 25;
+    const cost = diff === "Сложная" ? 3 : diff === "Невозможная" ? 15 : 50;
     if (!useEnergy(cost)) {
       alert("Недостаточно энергии!");
       return;
     }
+
 
     setDifficulty(diff);
     setMaxStages(diff === "Сложная" ? 15 : diff === "Невозможная" ? 45 : Infinity);
