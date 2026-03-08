@@ -7,6 +7,7 @@ import Header from "../components/Header";
 import ProfilePopup from "../components/ProfilePopup";
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
+import { notifyFriendAdded } from "../services/friendNotify";
 
 type SortKey = "fear" | "watermelons" | "boss_level" | "energy" | "telekinesis_level";
 
@@ -80,6 +81,8 @@ export default function Leaderboard() {
       friend_name: displayName,
       friend_telegram_id: entry.telegram_id,
     }, { onConflict: "telegram_id,friend_name" });
+    // Notify the added person in Telegram (fire-and-forget)
+    notifyFriendAdded(profile.telegram_id, entry.telegram_id);
     setAddedFriends(prev => new Set([...prev, entry.telegram_id]));
     setAddingFriend(null);
   };
