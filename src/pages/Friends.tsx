@@ -181,15 +181,26 @@ export default function Friends() {
     const nameToAdd = foundUser.character_name || foundUser.first_name;
     addFriend(nameToAdd);
     if (profile?.telegram_id) {
+      const myName = character?.name || "";
+
+      // Insert A→B
       const { error } = await supabase.from("friends").upsert({
         telegram_id: profile.telegram_id,
         friend_name: nameToAdd,
         friend_telegram_id: foundUser.telegram_id,
       }, { onConflict: "telegram_id,friend_name" });
       if (error) console.error("Friend save error:", error);
-      else {
-        notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
+
+      // Insert B→A (mutual) — only if the other user has a character
+      if (myName && foundUser.telegram_id) {
+        await supabase.from("friends").upsert({
+          telegram_id: foundUser.telegram_id,
+          friend_name: myName,
+          friend_telegram_id: profile.telegram_id,
+        }, { onConflict: "telegram_id,friend_name" });
       }
+
+      notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
     }
     setNewFriendInput("");
     setSearchStatus("idle");
