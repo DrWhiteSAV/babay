@@ -1299,7 +1299,9 @@ export default function Game() {
                   {chatMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
                       {msg.sender === "danil" && (
-                        <img src={DANIL_AVATAR} alt="ДанИИл" className="w-7 h-7 rounded-full object-cover mr-2 shrink-0 self-end" />
+                        <button onClick={() => setShowDanilProfile(true)} className="shrink-0 self-end mr-2">
+                          <img src={DANIL_AVATAR} alt="ДанИИл" className="w-7 h-7 rounded-full object-cover" />
+                        </button>
                       )}
                       <div className={`max-w-[80%] p-3 rounded-2xl ${msg.sender === "user" ? "bg-red-900 text-white rounded-tr-sm" : "bg-neutral-800 text-neutral-200 rounded-tl-sm"}`}>
                         <p className="text-sm">{msg.text}</p>
