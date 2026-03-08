@@ -711,7 +711,11 @@ export default function Game() {
     const reward = Math.floor(storeConfig.bossRewardBase * Math.pow(storeConfig.bossRewardMultiplier, bossLevel - 1) * bossRewardMultiplier);
     if (newTaps >= maxHp) {
       setIsBossDefeated(true);
-      if (pvpRoomId || pvpParticipants.length > 0) setLocalWatermelons(w => w + reward);
+      if (pvpRoomId || pvpParticipants.length > 0) setLocalWatermelons(w => {
+        const next = w + reward;
+        localWatermelonsRef.current = next;
+        return next;
+      });
       else addWatermelons(reward);
       playSuccess(settings.musicVolume);
     }
