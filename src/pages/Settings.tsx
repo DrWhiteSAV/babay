@@ -480,6 +480,77 @@ export default function Settings() {
           </button>
         </section>
 
+        {/* History of snapshots */}
+        <section>
+          <button
+            onClick={() => setHistoryOpen(v => !v)}
+            className="w-full py-4 bg-neutral-900/50 backdrop-blur-sm hover:bg-neutral-800 text-white border border-neutral-800 rounded-xl font-bold transition-colors flex items-center justify-between px-4"
+          >
+            <span className="flex items-center gap-2">
+              <History size={18} className="text-blue-400" /> История версий
+              {history.length > 0 && <span className="text-xs bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded-full">{history.length}</span>}
+            </span>
+            {historyOpen ? <ChevronUp size={18} className="text-neutral-500" /> : <ChevronDown size={18} className="text-neutral-500" />}
+          </button>
+
+          <AnimatePresence>
+            {historyOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 space-y-2">
+                  {historyLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 size={20} className="animate-spin text-neutral-500" />
+                    </div>
+                  ) : history.length === 0 ? (
+                    <p className="text-center text-neutral-500 text-sm py-4">История пуста — сбросьте прогресс хотя бы раз</p>
+                  ) : history.map((snap) => {
+                    const date = new Date(snap.snapshot_at);
+                    const dateStr = date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+                    const timeStr = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+                    const reasonLabel = snap.snapshot_reason === "reset" ? "Сброс" :
+                      snap.snapshot_reason === "before_restore" ? "До восстановления" :
+                      snap.snapshot_reason || "Снимок";
+                    return (
+                      <div key={snap.id} className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
+                        {snap.avatar_url ? (
+                          <img src={snap.avatar_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-neutral-700" onError={(e) => { (e.target as HTMLImageElement).src = "https://i.ibb.co/BVgY7XrT/babai.png"; }} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0 text-2xl">👻</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white text-sm truncate">{snap.character_name || "Безымянный"}</p>
+                          <p className="text-xs text-neutral-400">
+                            😱 {snap.fear} • 🍉 {snap.watermelons} • ⚔️ Ур.{snap.boss_level}
+                          </p>
+                          <p className="text-[10px] text-neutral-600 mt-0.5">
+                            {reasonLabel} • {dateStr} {timeStr}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRestoreSnapshot(snap)}
+                          disabled={restoringId === snap.id}
+                          className="shrink-0 flex items-center gap-1 px-3 py-2 bg-blue-900/40 hover:bg-blue-800/60 border border-blue-800/50 text-blue-300 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                        >
+                          {restoringId === snap.id
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <RotateCcw size={12} />
+                          }
+                          Вернуть
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
         {/* Reset Data */}
         <section className="pt-4 space-y-4">
           <button
