@@ -40,16 +40,23 @@ export default function Settings() {
     try {
       const telegramId = profile?.telegram_id;
       if (telegramId) {
-        // Merge settings into custom_settings in DB
+        // Re-read FULL row from DB first to never accidentally overwrite character fields
         const { data: existing } = await supabase
           .from("player_stats")
-          .select("custom_settings")
+          .select("custom_settings, character_name, character_gender, character_style, avatar_url, lore")
           .eq("telegram_id", telegramId)
           .single();
-        
+
         const existingCs = (existing?.custom_settings as any) || {};
+        // Only update settings keys — preserve wishes/inventory and character fields untouched
         await supabase.from("player_stats").upsert({
           telegram_id: telegramId,
+          // Preserve character fields from DB (not from store) to avoid race overwrite
+          ...(existing?.character_name ? { character_name: existing.character_name } : {}),
+          ...(existing?.character_gender ? { character_gender: existing.character_gender } : {}),
+          ...(existing?.character_style ? { character_style: existing.character_style } : {}),
+          ...(existing?.avatar_url ? { avatar_url: existing.avatar_url } : {}),
+          ...(existing?.lore ? { lore: existing.lore } : {}),
           custom_settings: {
             ...existingCs,
             buttonSize: settings.buttonSize,
