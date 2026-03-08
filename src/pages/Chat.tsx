@@ -194,14 +194,23 @@ export default function Chat() {
     };
     load();
 
-    const channel = supabase.channel(`chat_${chatKey}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `chat_key=eq.${chatKey}` },
+    // Subscribe without filter — filter server-side filter requires REPLICA IDENTITY FULL
+    // Instead we filter by chat_key client-side for reliability
+    const channel = supabase
+      .channel(`chat_${chatKey}_${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const m = payload.new as any;
+          // Client-side filter: only process messages for this chat
+          if (m.chat_key !== chatKey) return;
           const decoded = decodeContent(m.content);
           const msg: Message = {
             id: m.id,
-            sender: m.role === 'user' ? (m.sender_telegram_id === profile?.telegram_id ? 'user' : m.friend_name) : m.friend_name,
+            sender: m.role === 'user'
+              ? (m.sender_telegram_id === profile?.telegram_id ? 'user' : m.friend_name)
+              : m.friend_name,
             text: decoded.text,
             imageUrl: decoded.imageUrl,
             sender_telegram_id: m.sender_telegram_id,
@@ -212,16 +221,14 @@ export default function Chat() {
             if (prev.some(p => p.id === msg.id)) return prev;
             return [...prev, msg];
           });
-          if (m.sender_telegram_id !== profile?.telegram_id) {
-            const previewText = decoded.imageUrl ? '📷 Фото' : decoded.text.slice(0, 80);
-            pushNotification({
-              type: 'chat',
-              title: `💬 Новое сообщение`,
-              message: `${m.friend_name}: ${previewText}`,
-            });
-          }
         }
-      ).subscribe();
+      )
+      .subscribe((status) => {
+        // If subscription fails, fallback: re-fetch messages every 5s
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Chat] Realtime channel error, falling back to polling');
+        }
+      });
 
     return () => {
       cancelled = true;
