@@ -186,27 +186,31 @@ function AppContent() {
   // }
 
   return (
-    <div 
-      className={`min-h-[100dvh] bg-neutral-950 text-neutral-100 ${fontClass} ${themeClass} selection:bg-red-900 selection:text-white ${buttonSizeClass}`}
-      style={activeBgUrl ? {
-        backgroundImage: `linear-gradient(to bottom, rgba(23, 23, 23, ${dimmingTop}), rgba(23, 23, 23, ${dimmingBottom})), url(${activeBgUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      } : {}}
-    >
-      <NotificationPopupProvider />
-      {!hasSeenInitialCutscene && (
-        <CutscenePlayer onComplete={() => setHasSeenInitialCutscene(true)} />
+    <>
+      {!assetsPreloaded && (
+        <AssetPreloader onComplete={() => setAssetsPreloaded(true)} />
       )}
-      <style>{`
-        * {
-          -webkit-text-fill-color: color-mix(in srgb, currentColor ${settings.fontBrightness ?? 100}%, black) !important;
-        }
-      `}</style>
       <div 
-        className="w-full max-w-7xl mx-auto h-[100dvh] shadow-2xl relative overflow-hidden flex flex-col md:flex-row pb-16 md:pb-0"
+        className={`min-h-[100dvh] bg-neutral-950 text-neutral-100 ${fontClass} ${themeClass} selection:bg-red-900 selection:text-white ${buttonSizeClass}`}
+        style={activeBgUrl ? {
+          backgroundImage: `linear-gradient(to bottom, rgba(23, 23, 23, ${dimmingTop}), rgba(23, 23, 23, ${dimmingBottom})), url(${activeBgUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        } : {}}
       >
+        <NotificationPopupProvider />
+        {assetsPreloaded && !hasSeenInitialCutscene && (
+          <CutscenePlayer onComplete={() => setHasSeenInitialCutscene(true)} />
+        )}
+        <style>{`
+          * {
+            -webkit-text-fill-color: color-mix(in srgb, currentColor ${settings.fontBrightness ?? 100}%, black) !important;
+          }
+        `}</style>
+        <div 
+          className="w-full max-w-7xl mx-auto h-[100dvh] shadow-2xl relative overflow-hidden flex flex-col md:flex-row pb-16 md:pb-0"
+        >
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/create" element={<CharacterCreate />} />
