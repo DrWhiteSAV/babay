@@ -110,5 +110,5 @@ export function useIncomingMessageNotifier() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.telegram_id, friends.length, groupChats.length, location.pathname]);
+  }, [profile?.telegram_id, friends.length, groupChats.length, location.pathname, friendTidMap]);
 }
