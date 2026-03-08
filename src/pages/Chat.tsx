@@ -352,12 +352,17 @@ export default function Chat() {
 
     // ── Anti-repeat guard: check if there's ALREADY a reply from me AFTER the last friend message ──
     // This prevents re-answering every time the user opens the chat
-    const lastFriendMsgIdx = messages.findLastIndex(
-      m => m.sender !== 'user' && m.sender_telegram_id !== profile?.telegram_id && !m.id.startsWith('pending_')
-    );
+    let lastFriendMsgIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m: Message = messages[i];
+      if (m.sender !== 'user' && m.sender_telegram_id !== profile?.telegram_id && !m.id.startsWith('pending_')) {
+        lastFriendMsgIdx = i;
+        break;
+      }
+    }
     if (lastFriendMsgIdx !== -1) {
       const hasMyReplyAfter = messages.slice(lastFriendMsgIdx + 1).some(
-        m => m.sender === 'user' || m.sender_telegram_id === profile?.telegram_id
+        (m: Message) => m.sender === 'user' || m.sender_telegram_id === profile?.telegram_id
       );
       if (hasMyReplyAfter) return; // Already replied — don't repeat
     }
