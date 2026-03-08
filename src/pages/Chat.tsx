@@ -104,8 +104,12 @@ export default function Chat() {
   const aiResolvedRef = useRef(false);
   const lastAutoRespondedIdRef = useRef<string | null>(null);
 
-  const [aiSubCountdown, setAiSubCountdown] = useState(0);
+  // AI-substitute countdown shown as typing bubble in message feed
+  const [aiSubCountdown, setAiSubCountdown] = useState(0); // used in banner only to cancel
+  const [aiSubTypingCountdown, setAiSubTypingCountdown] = useState(0); // shown in message bubble
   const aiSubIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // broadcast channel ref for AI-substitute typing indicator
+  const aiSubBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
