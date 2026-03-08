@@ -6,9 +6,6 @@ import { supabase } from "../integrations/supabase/client";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Zap, Skull, Users, Swords, Check, Loader2 } from "lucide-react";
 
-const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
-
 type Difficulty = "Сложная" | "Невозможная";
 
 interface FriendMeta {
