@@ -245,7 +245,6 @@ export default function Chat() {
   // ── AI-Substitute: auto-respond to incoming real-user messages ──────────────
   // When isAiSubstitute is ON and a new message arrives from the other real user,
   // automatically generate and send an AI reply on the current user's behalf.
-  const lastAutoRespondedIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isAiSubstitute) return;
     if (!friend || !character || !chatKey) return;
