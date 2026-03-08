@@ -117,26 +117,48 @@ export default function Gallery() {
 
     const telegramId = profile?.telegram_id;
 
-    // Parse name and lore from label
-    // Label format examples:
-    //   "[avatars] Пижамный Ужас | Лор..."
-    //   "[avatars] Имя | Лор"
-    //   "Аватар: Пижамный Ужас"   <- legacy format
-    let rawLabel = (selectedImage.label || "")
-      .replace(/^\[(avatars?|backgrounds?|bosses?)\]\s*/i, "") // strip [avatars] prefix
-      .replace(/^Аватар:\s*/i, "")                              // strip legacy "Аватар: " prefix
-      .trim();
+    // First, try to find full metadata in the avatars table
+    let parsedName: string | null = null;
+    let parsedLore: string | null = null;
+    let parsedWishes: string[] = [];
+    let parsedStyle: string | null = null;
+    let parsedGender: string | null = null;
 
-    // Split by "|" or " — " to extract name vs lore
-    const parts = rawLabel.split(/\s*\|\s*|\s+—\s+/);
-    const parsedName = parts[0]?.trim() || null;
-    const parsedLore = parts.slice(1).join(" — ").trim() || null;
+    if (telegramId) {
+      const { data: avatarRow } = await supabase
+        .from("avatars")
+        .select("*")
+        .eq("telegram_id", telegramId)
+        .eq("image_url", selectedImage.image_url)
+        .maybeSingle();
+
+      if (avatarRow) {
+        parsedName = avatarRow.name || null;
+        parsedLore = avatarRow.lore || null;
+        parsedWishes = Array.isArray(avatarRow.wishes) ? avatarRow.wishes : [];
+        parsedStyle = avatarRow.style || null;
+        parsedGender = avatarRow.gender || null;
+        console.log("[Gallery] Found avatar metadata in avatars table:", { parsedName, parsedLore: parsedLore?.substring(0, 60), parsedWishes });
+      } else {
+        // Fallback: parse from label "[avatars] Name | Lore"
+        const rawLabel = (selectedImage.label || "")
+          .replace(/^\[(avatars?|backgrounds?|bosses?)\]\s*/i, "")
+          .replace(/^Аватар:\s*/i, "")
+          .trim();
+        const parts = rawLabel.split(/\s*\|\s*/);
+        parsedName = parts[0]?.trim() || null;
+        parsedLore = parts.slice(1).join(" | ").trim() || null;
+        console.log("[Gallery] Parsed from label (no avatars row found):", { parsedName, parsedLore: parsedLore?.substring(0, 60) });
+      }
+    }
 
     const updates: Record<string, unknown> = {
       avatar_url: selectedImage.image_url,
     };
     if (parsedName) updates.character_name = parsedName;
     if (parsedLore) updates.lore = parsedLore;
+    if (parsedStyle) updates.character_style = parsedStyle;
+    if (parsedGender) updates.character_gender = parsedGender;
 
     console.log(`[DB WRITE] 📝 Gallery SET AVATAR for telegram_id=${telegramId}`, {
       avatar_url: selectedImage.image_url.substring(0, 60),
@@ -144,14 +166,18 @@ export default function Gallery() {
       lore: parsedLore?.substring(0, 80),
     });
 
-    // Update store immediately
+    // Update store immediately (all identity fields)
     updateCharacter({
       avatarUrl: selectedImage.image_url,
       ...(parsedName ? { name: parsedName } : {}),
       ...(parsedLore ? { lore: parsedLore } : {}),
+      ...(parsedStyle ? { style: parsedStyle as any } : {}),
+      ...(parsedGender ? { gender: parsedGender as any } : {}),
+      ...(parsedWishes.length > 0 ? { wishes: parsedWishes } : {}),
     });
 
     if (telegramId) {
+      // Update player_stats identity fields
       const { error } = await supabase.from("player_stats")
         .update(updates)
         .eq("telegram_id", telegramId);
@@ -159,7 +185,23 @@ export default function Gallery() {
       if (error) {
         console.error("[DB WRITE] ❌ Gallery set avatar error:", error.message);
       } else {
-        console.log("[DB WRITE] ✅ Gallery avatar + name/lore saved to player_stats");
+        console.log("[DB WRITE] ✅ Gallery avatar + identity saved to player_stats");
+      }
+
+      // Update wishes in custom_settings if we have them
+      if (parsedWishes.length > 0) {
+        const { data: existing } = await supabase
+          .from("player_stats")
+          .select("custom_settings")
+          .eq("telegram_id", telegramId)
+          .single();
+        const cs = existing?.custom_settings && typeof existing.custom_settings === "object"
+          ? existing.custom_settings as Record<string, unknown>
+          : {};
+        await supabase.from("player_stats")
+          .update({ custom_settings: { ...cs, wishes: parsedWishes } })
+          .eq("telegram_id", telegramId);
+        console.log("[DB WRITE] ✅ Gallery avatar wishes saved to custom_settings");
       }
     }
     setSelectedImage(null);
