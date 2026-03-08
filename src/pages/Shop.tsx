@@ -406,7 +406,7 @@ export default function Shop() {
         )}
       </AnimatePresence>
 
-      {/* Avatar Evolution Popup — fullscreen with download */}
+      {/* Avatar Evolution Popup — fullscreen with countdown timer and retry */}
       <AnimatePresence>
         {avatarEvolvePopup && (
           <motion.div
@@ -418,15 +418,33 @@ export default function Shop() {
             <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">
               <Sparkles size={20} /> Эволюция аватара: {avatarEvolvePopup.itemName}
             </h3>
-            <p className="text-xs text-neutral-500 mb-4 animate-pulse">{avatarEvolvePopup.progress}</p>
+            <p className={`text-xs mb-4 ${avatarEvolvePopup.isGenerating ? "text-neutral-500 animate-pulse" : avatarEvolvePopup.newAvatar ? "text-green-400" : "text-red-400"}`}>
+              {avatarEvolvePopup.progress}
+            </p>
 
             {avatarEvolvePopup.isGenerating ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <Loader2 size={64} className="animate-spin text-purple-500" />
-                <p className="text-neutral-400 text-sm">Нейросеть рисует новый образ...</p>
+              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                {/* Circular countdown */}
+                <div className="relative w-32 h-32">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(168,85,247,0.15)" strokeWidth="8" />
+                    <circle
+                      cx="50" cy="50" r="44"
+                      fill="none" stroke="rgba(168,85,247,0.8)" strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 44}`}
+                      strokeDashoffset={`${2 * Math.PI * 44 * (1 - countdown / GENERATION_TIMEOUT_SEC)}`}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-purple-300">{countdown}</span>
+                    <span className="text-xs text-neutral-500">сек</span>
+                  </div>
+                </div>
+                <p className="text-neutral-400 text-sm text-center">Нейросеть рисует новый образ...</p>
               </div>
             ) : avatarEvolvePopup.newAvatar ? (
-              // Fullscreen new avatar
               <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full">
                 <img
                   src={avatarEvolvePopup.newAvatar}
@@ -452,11 +470,23 @@ export default function Shop() {
                     <ExternalLink size={16} /> Открыть
                   </a>
                 </div>
-                <p className="text-[10px] text-neutral-600 text-center break-all max-w-xs">{avatarEvolvePopup.newAvatar}</p>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-neutral-500">Не удалось сгенерировать аватар</p>
+              /* Failed state */
+              <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <p className="text-neutral-500 text-sm text-center">ИИ не вернул картинку или случилась ошибка</p>
+                {avatarEvolvePopup.pendingItem && (
+                  <button
+                    onClick={() => {
+                      if (avatarEvolvePopup.pendingItem) {
+                        runAvatarGeneration(avatarEvolvePopup.pendingItem, avatarEvolvePopup.pendingInventory);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-5 py-3 bg-orange-700 hover:bg-orange-600 text-white rounded-xl font-bold text-sm transition-colors"
+                  >
+                    <RefreshCw size={16} /> ИИ тупит, давай ещё раз?
+                  </button>
+                )}
               </div>
             )}
 
