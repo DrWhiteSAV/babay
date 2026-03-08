@@ -880,8 +880,9 @@ export default function Chat() {
               exit={{ opacity: 0, y: 4 }}
               className="flex justify-start items-end gap-2"
             >
+              {/* Show sender's avatar: owner sees own avatar (ИИ пишет за тебя), recipient sees friend's avatar */}
               <img
-                src={getAvatarUrl(friend?.name || chatTitle || "user")}
+                src={isAiSubstitute ? getAvatarUrl("user") : getAvatarUrl(friend?.name || chatTitle || "user")}
                 alt="ai-sub"
                 className="w-7 h-7 rounded-full object-cover border border-green-500/30"
               />
