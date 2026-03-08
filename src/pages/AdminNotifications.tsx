@@ -220,24 +220,32 @@ export default function AdminNotifications() {
     setForm(f => ({ ...f, message: f.message + macro }));
   };
 
+  const msgRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+
+  const insertMacroIntoMessage = (macro: string) => {
+    const ta = msgRef.current;
+    if (!ta) { setForm(f => ({ ...f, message: f.message + macro })); return; }
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const newVal = form.message.slice(0, s) + macro + form.message.slice(e);
+    setForm(f => ({ ...f, message: newVal }));
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(s + macro.length, s + macro.length); }, 0);
+  };
+
   const handleAiImprove = async () => {
     if (!form.message) return;
     setAiImproving(true);
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyCUCb8uYbhPOJSqKw4TtZrCkdLyVlDDbiE";
-      const prompt = `Улучши этот текст уведомления для мобильного приложения "Бабай" (игра про славянских кибер-духов в пижамах). Сделай его более живым, атмосферным, с юмором. Сохрани все макросы вида {macro} без изменений. Верни только улучшенный текст, без объяснений.
-
-Тип уведомления: ${NOTIF_TYPES.find(t => t.value === form.type)?.label}
-Оригинальный текст:
-${form.message}`;
-
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const aiPrompt = `Улучши этот текст уведомления для мобильного приложения "Бабай" (игра про славянских кибер-духов). Сделай его более живым, атмосферным, с юмором. Сохрани все макросы вида {macro} без изменений. Верни только улучшенный текст, без объяснений.\n\nТип: ${NOTIF_TYPES.find(t => t.value === form.type)?.label}\nОригинал:\n${form.message}`;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ type: "text", prompt: aiPrompt }),
       });
       const data = await res.json();
-      const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      const improved = data?.text?.trim();
       if (improved) setForm(f => ({ ...f, message: improved }));
     } catch (e) {
       console.error('AI improve error:', e);
