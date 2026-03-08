@@ -624,7 +624,8 @@ export default function Game() {
 
     if (isCorrect) {
       const fearReward = 1 + (character ? (character.telekinesisLevel - 1) * storeConfig.telekinesisRewardBonus : 0);
-      if (pvpParticipants.length > 0) setLocalFear(f => f + fearReward);
+      // PVP real-room OR legacy local sim: track score locally, don't add to global store yet
+      if (pvpRoomId || pvpParticipants.length > 0) setLocalFear(f => f + fearReward);
       else addFear(fearReward);
       setScore(s => s + 1);
       playSuccess(settings.musicVolume);
@@ -659,7 +660,7 @@ export default function Game() {
     const reward = Math.floor(storeConfig.bossRewardBase * Math.pow(storeConfig.bossRewardMultiplier, bossLevel - 1) * bossRewardMultiplier);
     if (newTaps >= maxHp) {
       setIsBossDefeated(true);
-      if (pvpParticipants.length > 0) setLocalWatermelons(w => w + reward);
+      if (pvpRoomId || pvpParticipants.length > 0) setLocalWatermelons(w => w + reward);
       else addWatermelons(reward);
       playSuccess(settings.musicVolume);
     }
