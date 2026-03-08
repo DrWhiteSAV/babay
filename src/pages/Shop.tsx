@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
-import { ShoppingCart, Skull, Zap, Loader2, X, Sparkles, User, Download, ExternalLink } from "lucide-react";
+import { ShoppingCart, Skull, Loader2, X, Sparkles, Download, ExternalLink, RefreshCw } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 import Header from "../components/Header";
 import { useTelegram } from "../context/TelegramContext";
@@ -11,8 +11,13 @@ import { supabase } from "../integrations/supabase/client";
 const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
 
-// Generates new avatar via ProTalk, uploads to ImgBB via save-to-gallery, saves to gallery table
-// Returns the final imgbb URL (not a ProTalk URL)
+const GENERATION_TIMEOUT_SEC = 120;
+
+/**
+ * Generates new avatar via ProTalk → saves to gallery (ImgBB + DB + Telegram DM).
+ * Returns the final imgbb URL. The save-to-gallery EF handles:
+ * - ImgBB upload, gallery DB insert (label=[avatars]), player_stats avatar_url update, Telegram photo send.
+ */
 async function generateAndSaveAvatar(
   character: any,
   allOwnedItems: string[],
@@ -22,7 +27,7 @@ async function generateAndSaveAvatar(
   const genderDesc = character.gender === "Бабайка" ? "женский" : "мужской";
   const wishesStr = (character.wishes || []).join(", ") || "обычная внешность";
   const loreSnippet = character.lore ? ` Лор: ${character.lore.substring(0, 150)}.` : "";
-  const prompt = `Нарисуй горизонтальный обновлённый портрет славянского духа по имени ${character.name} (пол: ${genderDesc}). Стиль: ${character.style}. Особые приметы: ${wishesStr}.${loreSnippet} Ранее купленные предметы: ${allOwnedItems.slice(0, -1).join(", ") || "нет"}. НОВЫЙ предмет: ${newItemName} — должен быть заметно виден. Горизонтальная ориентация. Высокое качество.`;
+  const prompt = `Нарисуй обновлённый портрет славянского духа по имени ${character.name} (пол: ${genderDesc}). Стиль: ${character.style}. Особые приметы: ${wishesStr}.${loreSnippet} Ранее купленные предметы: ${allOwnedItems.slice(0, -1).join(", ") || "нет"}. НОВЫЙ предмет: ${newItemName} — должен быть заметно виден. Высокое качество.`;
 
   // Step 1: Generate via ProTalk
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
@@ -35,33 +40,29 @@ async function generateAndSaveAvatar(
   const rawUrl = data.imageUrl;
   if (!rawUrl || !rawUrl.startsWith("http")) return null;
 
-  // Step 2: Upload to ImgBB via save-to-gallery edge function → returns imgbb URL
+  // Step 2: save-to-gallery EF — uploads to ImgBB, inserts gallery row as [avatars],
+  //          updates player_stats avatar_url, sends Telegram DM photo
   const galResp = await fetch(`${SUPABASE_URL}/functions/v1/save-to-gallery`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
     body: JSON.stringify({
       imageUrl: rawUrl,
       telegramId,
-      label: `[avatars] ${character.name} + ${newItemName}`,
+      label: `[avatars] ${character.name}`,
       characterName: character.name,
       lore: character.lore || null,
+      wishes: character.wishes || [],
+      style: character.style || null,
+      gender: character.gender || null,
       prompt,
     }),
   });
 
-  if (!galResp.ok) {
-    // Fallback: try to upload directly to imgbb
-    return rawUrl;
-  }
+  if (!galResp.ok) return rawUrl;
 
   const galData = await galResp.json();
-  // Prefer imgbb URL (gallery_item.image_url is imgbb), then storage_url, then raw
-  const imgbbUrl = galData.gallery_item?.image_url || galData.storage_url;
-  if (imgbbUrl && imgbbUrl.startsWith("http") && imgbbUrl.includes("ibb.co")) {
-    return imgbbUrl;
-  }
-  // Return whatever we got
-  return imgbbUrl || rawUrl;
+  const finalUrl = galData.gallery_item?.image_url || galData.storage_url;
+  return finalUrl && finalUrl.startsWith("http") ? finalUrl : rawUrl;
 }
 
 export default function Shop() {
@@ -83,7 +84,34 @@ export default function Shop() {
     isGenerating: boolean;
     itemName: string;
     progress: string;
+    pendingItem: any | null; // kept for retry
+    pendingInventory: string[];
   } | null>(null);
+
+  // 120s countdown timer
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCountdown = () => {
+    setCountdown(GENERATION_TIMEOUT_SEC);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopCountdown = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(0);
+  };
+
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
   const playSuccessSound = () => {
     try {
@@ -92,6 +120,36 @@ export default function Shop() {
       audio.play().catch(() => {});
     } catch {}
   };
+
+  const runAvatarGeneration = useCallback(async (item: any, allOwnedItems: string[]) => {
+    if (!character || !profile?.telegram_id) return;
+
+    setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: true, progress: "Отправляю запрос к нейросети...", newAvatar: null } : null);
+    startCountdown();
+
+    try {
+      const imgbbUrl = await generateAndSaveAvatar(
+        character,
+        allOwnedItems,
+        item.name,
+        profile.telegram_id,
+      );
+
+      stopCountdown();
+
+      if (imgbbUrl) {
+        // Update store + DB (save-to-gallery already updated DB, but sync store)
+        updateCharacter({ avatarUrl: imgbbUrl });
+        setAvatarEvolvePopup(prev => prev ? { ...prev, newAvatar: imgbbUrl, isGenerating: false, progress: "Готово!" } : null);
+      } else {
+        setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "ИИ не вернул картинку" } : null);
+      }
+    } catch (e) {
+      stopCountdown();
+      console.error("[Shop] Avatar evolution error:", e);
+      setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Ошибка генерации" } : null);
+    }
+  }, [character, profile]);
 
   const handleBuy = async (item: any) => {
     if (inventory.includes(item.id)) {
@@ -116,39 +174,21 @@ export default function Shop() {
       setTimeout(() => setSuccessEffect(null), 2000);
       setSelectedItem(null);
 
-      const oldAvatar = character.avatarUrl;
-      setAvatarEvolvePopup({ oldAvatar, newAvatar: null, isGenerating: true, itemName: item.name, progress: "Генерирую образ..." });
-
       const allOwnedItems = [...inventory, item.id]
         .map(id => [...shopItems, ...bossItems].find(i => i.id === id)?.name)
         .filter(Boolean) as string[];
 
-      try {
-        setAvatarEvolvePopup(prev => prev ? { ...prev, progress: "Отправляю запрос к нейросети..." } : null);
+      setAvatarEvolvePopup({
+        oldAvatar: character.avatarUrl,
+        newAvatar: null,
+        isGenerating: true,
+        itemName: item.name,
+        progress: "Генерирую образ...",
+        pendingItem: item,
+        pendingInventory: allOwnedItems,
+      });
 
-        const imgbbUrl = await generateAndSaveAvatar(
-          character,
-          allOwnedItems,
-          item.name,
-          profile.telegram_id,
-        );
-
-        if (imgbbUrl) {
-          // Update character avatar in store
-          updateCharacter({ avatarUrl: imgbbUrl });
-          // Update avatar_url in player_stats DB
-          await supabase.from("player_stats")
-            .update({ avatar_url: imgbbUrl })
-            .eq("telegram_id", profile.telegram_id);
-
-          setAvatarEvolvePopup(prev => prev ? { ...prev, newAvatar: imgbbUrl, isGenerating: false, progress: "Готово!" } : null);
-        } else {
-          setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Не удалось сгенерировать" } : null);
-        }
-      } catch (e) {
-        console.error("[Shop] Avatar evolution error:", e);
-        setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Ошибка генерации" } : null);
-      }
+      await runAvatarGeneration(item, allOwnedItems);
     }
 
     setIsProcessing(false);
@@ -366,7 +406,7 @@ export default function Shop() {
         )}
       </AnimatePresence>
 
-      {/* Avatar Evolution Popup — fullscreen with download */}
+      {/* Avatar Evolution Popup — fullscreen with countdown timer and retry */}
       <AnimatePresence>
         {avatarEvolvePopup && (
           <motion.div
@@ -378,15 +418,33 @@ export default function Shop() {
             <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">
               <Sparkles size={20} /> Эволюция аватара: {avatarEvolvePopup.itemName}
             </h3>
-            <p className="text-xs text-neutral-500 mb-4 animate-pulse">{avatarEvolvePopup.progress}</p>
+            <p className={`text-xs mb-4 ${avatarEvolvePopup.isGenerating ? "text-neutral-500 animate-pulse" : avatarEvolvePopup.newAvatar ? "text-green-400" : "text-red-400"}`}>
+              {avatarEvolvePopup.progress}
+            </p>
 
             {avatarEvolvePopup.isGenerating ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <Loader2 size={64} className="animate-spin text-purple-500" />
-                <p className="text-neutral-400 text-sm">Нейросеть рисует новый образ...</p>
+              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                {/* Circular countdown */}
+                <div className="relative w-32 h-32">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(168,85,247,0.15)" strokeWidth="8" />
+                    <circle
+                      cx="50" cy="50" r="44"
+                      fill="none" stroke="rgba(168,85,247,0.8)" strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 44}`}
+                      strokeDashoffset={`${2 * Math.PI * 44 * (1 - countdown / GENERATION_TIMEOUT_SEC)}`}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-purple-300">{countdown}</span>
+                    <span className="text-xs text-neutral-500">сек</span>
+                  </div>
+                </div>
+                <p className="text-neutral-400 text-sm text-center">Нейросеть рисует новый образ...</p>
               </div>
             ) : avatarEvolvePopup.newAvatar ? (
-              // Fullscreen new avatar
               <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full">
                 <img
                   src={avatarEvolvePopup.newAvatar}
@@ -412,11 +470,23 @@ export default function Shop() {
                     <ExternalLink size={16} /> Открыть
                   </a>
                 </div>
-                <p className="text-[10px] text-neutral-600 text-center break-all max-w-xs">{avatarEvolvePopup.newAvatar}</p>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-neutral-500">Не удалось сгенерировать аватар</p>
+              /* Failed state */
+              <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <p className="text-neutral-500 text-sm text-center">ИИ не вернул картинку или случилась ошибка</p>
+                {avatarEvolvePopup.pendingItem && (
+                  <button
+                    onClick={() => {
+                      if (avatarEvolvePopup.pendingItem) {
+                        runAvatarGeneration(avatarEvolvePopup.pendingItem, avatarEvolvePopup.pendingInventory);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-5 py-3 bg-orange-700 hover:bg-orange-600 text-white rounded-xl font-bold text-sm transition-colors"
+                  >
+                    <RefreshCw size={16} /> ИИ тупит, давай ещё раз?
+                  </button>
+                )}
               </div>
             )}
 
