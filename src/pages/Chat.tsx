@@ -1074,11 +1074,37 @@ export default function Chat() {
         )}
 
         {/* Image preview */}
+        {/* Image upload progress */}
+        {uploadStatus !== "idle" && uploadStatus !== "done" && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            {uploadStatus === "reading" && (
+              <><span className="animate-spin text-blue-400">⏳</span><span className="text-neutral-300">Чтение файла...</span></>
+            )}
+            {uploadStatus === "uploading" && (
+              <><span className="animate-spin inline-block text-yellow-400">🔄</span><span className="text-neutral-300">Загрузка на сервер...</span><div className="ml-auto flex gap-0.5">{[0,1,2].map(i => <span key={i} className="w-1 h-1 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</div></>
+            )}
+            {uploadStatus === "error" && (
+              <><span className="text-red-400">❌</span><span className="text-red-300">Ошибка загрузки</span></>
+            )}
+          </motion.div>
+        )}
+        {uploadStatus === "done" && selectedImage && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-1 flex items-center gap-1 text-[11px] text-green-400 px-1">
+            <Check size={11} /><span>Готово к отправке</span>
+          </motion.div>
+        )}
+
         {selectedImage && (
           <div className="mb-2 relative inline-block">
             <img src={selectedImage} alt="preview" className="h-16 rounded-xl border border-white/10 object-cover" />
             <button
-              onClick={() => setSelectedImage(null)}
+              onClick={() => { setSelectedImage(null); setUploadStatus("idle"); }}
               className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-500 border border-white/20"
             >
               <X size={12} />
@@ -1091,10 +1117,14 @@ export default function Chat() {
           <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 rounded-xl text-neutral-400 hover:text-white transition-colors flex-shrink-0 self-end"
+            disabled={uploadStatus === "reading" || uploadStatus === "uploading"}
+            className={`p-2.5 rounded-xl transition-colors flex-shrink-0 self-end ${uploadStatus === "uploading" ? "text-yellow-400" : uploadStatus === "reading" ? "text-blue-400" : "text-neutral-400 hover:text-white"}`}
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
           >
-            <ImagePlus size={18} />
+            {uploadStatus === "uploading" || uploadStatus === "reading"
+              ? <Loader2 size={18} className="animate-spin" />
+              : <ImagePlus size={18} />
+            }
           </button>
 
           <textarea
