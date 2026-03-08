@@ -904,8 +904,8 @@ export default function Chat() {
                       </div>
                     )}
 
-                    {/* PVP Invite Button */}
-                    {msg.pvpRoomId && (
+                    {/* PVP Invite Button — only shown to the recipient, not the sender */}
+                    {msg.pvpRoomId && !isUser && (
                       <div className="mb-2">
                         <button
                           onClick={() => navigate(`/pvp/room/${msg.pvpRoomId}?join=1`)}
@@ -913,6 +913,18 @@ export default function Chat() {
                         >
                           <Swords size={16} />
                           Войти в комнату PVP
+                        </button>
+                      </div>
+                    )}
+                    {/* For organizer — show "Invitation sent" badge */}
+                    {msg.pvpRoomId && isUser && (
+                      <div className="mb-2">
+                        <button
+                          onClick={() => navigate(`/pvp/room/${msg.pvpRoomId}`)}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-neutral-700 hover:bg-neutral-600 active:scale-[0.97] rounded-xl font-bold text-sm transition-all w-full justify-center text-neutral-300"
+                        >
+                          <Swords size={16} className="text-red-400" />
+                          Открыть комнату PVP
                         </button>
                       </div>
                     )}

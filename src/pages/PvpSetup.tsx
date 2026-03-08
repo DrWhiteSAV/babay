@@ -105,14 +105,25 @@ export default function PvpSetup() {
     }
 
     // Send PVP invite via in-app chat message to each invited friend
+    // We insert two rows per conversation (one per participant's view) matching chat architecture
     const organizerName = character.name || profile?.first_name || "Бабай";
     const diffLabel = difficulty === "Сложная" ? "Сложная (15 этапов + Босс)" : "Невозможная (45 этапов + Босс ×2)";
 
     for (const tid of selected) {
-      // Build canonical chat_key (sorted tids)
       const chatKey = [tgId, tid].map(String).sort().join('_');
-      const pvpContent = `[pvp]:${roomId}\n⚔️ ${organizerName} приглашает в PVP!\n🎮 Режим: ${diffLabel}`;
+      const pvpContent = `[pvp]:${roomId}\n⚔️ ${organizerName} приглашает тебя в PVP!\n🎮 Режим: ${diffLabel}`;
       try {
+        // Row for the organizer's side (telegram_id = organizer)
+        await supabase.from("chat_messages").insert({
+          chat_key: chatKey,
+          telegram_id: tgId,
+          sender_telegram_id: tgId,
+          role: "user",
+          friend_name: organizerName,
+          content: pvpContent,
+          is_ai_reply: false,
+        } as any);
+        // Row for the friend's side (telegram_id = friend) so they see it in their chat
         await supabase.from("chat_messages").insert({
           chat_key: chatKey,
           telegram_id: tid,
