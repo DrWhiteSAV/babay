@@ -35,6 +35,9 @@ export default function Game() {
   } = usePlayerStore();
   const { profile } = useTelegram();
   const tgId = profile?.telegram_id;
+  // Always-fresh ref so async callbacks get the latest telegram_id regardless of closure staleness
+  const tgIdRef = useRef<number | undefined>(undefined);
+  useEffect(() => { tgIdRef.current = profile?.telegram_id; }, [profile?.telegram_id]);
 
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [stage, setStage] = useState(1);
@@ -211,7 +214,7 @@ export default function Game() {
         bossImageReadyRef.current = true;
         setBossImageReady(true);
         // Save to gallery [bosses] via saveImageToGallery (unified approach)
-        const activeTgId = tgId ?? profile?.telegram_id;
+        const activeTgId = tgIdRef.current ?? tgId ?? (charData ? Number(charData.telegram_id) || undefined : undefined);
         console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
           saveImageToGallery(bResult.url, activeTgId, `[bosses] Босс ур.${bossLevel}`, bResult.prompt)
@@ -377,7 +380,8 @@ export default function Game() {
           setBgImage(bgUrl);
           setBgGenRetry(false);
           // Save to gallery [backgrounds] via saveImageToGallery (unified approach)
-          const activeTgId = tgId ?? profile?.telegram_id;
+          const charTgId = Number(charData?.telegram_id) || undefined;
+          const activeTgId = tgIdRef.current ?? tgId ?? charTgId;
           console.log(`[Game] 🖼 background ready, tgId=${activeTgId}, saving to gallery...`);
           if (activeTgId) {
             saveImageToGallery(bgUrl, activeTgId, `[backgrounds] Фон: ${diff}`, (bgResult as any).prompt)
@@ -434,7 +438,8 @@ export default function Game() {
         bgGenResolvedRef.current = true;
         setBgImage(bgResult.url);
         setBgGenRetry(false);
-        const activeTgId = tgId ?? profile?.telegram_id;
+        const charTgId2 = Number(charData?.telegram_id) || undefined;
+        const activeTgId = tgIdRef.current ?? tgId ?? charTgId2;
         console.log(`[Game] 🔁 retry bg ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
           saveImageToGallery(bgResult.url, activeTgId, `[backgrounds] Фон: ${diff}`, bgResult.prompt)
