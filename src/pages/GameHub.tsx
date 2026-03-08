@@ -142,21 +142,36 @@ export default function GameHub() {
           ИГРАТЬ
         </motion.button>
 
-        {/* 3. Leaderboard block */}
-        <motion.button
+        {/* 3. Leaderboard + Chats row */}
+        <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          onClick={() => navigate("/leaderboard")}
-          data-theme-block="hub-leaderboard"
-          className="w-full flex flex-col items-center justify-center bg-neutral-900/70 backdrop-blur-sm border border-neutral-800 rounded-2xl px-5 py-4 hover:border-yellow-900/50 active:scale-[0.98] transition-all gap-2"
+          className="grid grid-cols-2 gap-3"
         >
-          <div className="w-9 h-9 rounded-xl bg-neutral-800 flex items-center justify-center">
-            <Trophy size={18} className="text-yellow-500" />
-          </div>
-          <p className="font-bold text-white text-sm">Рейтинг</p>
-          <p className="text-xs text-neutral-500">Лучшие Бабаи мира</p>
-        </motion.button>
+          <button
+            onClick={() => navigate("/leaderboard")}
+            data-theme-block="hub-leaderboard"
+            className="flex flex-col items-center justify-center bg-neutral-900/70 backdrop-blur-sm border border-neutral-800 rounded-2xl px-5 py-4 hover:border-yellow-900/50 active:scale-[0.98] transition-all gap-2"
+          >
+            <div className="w-9 h-9 rounded-xl bg-neutral-800 flex items-center justify-center">
+              <Trophy size={18} className="text-yellow-500" />
+            </div>
+            <p className="font-bold text-white text-sm">Рейтинг</p>
+            <p className="text-xs text-neutral-500">Лучшие Бабаи мира</p>
+          </button>
+          <button
+            onClick={() => navigate("/chats")}
+            data-theme-block="hub-chats"
+            className="flex flex-col items-center justify-center bg-neutral-900/70 backdrop-blur-sm border border-neutral-800 rounded-2xl px-5 py-4 hover:border-blue-900/50 active:scale-[0.98] transition-all gap-2"
+          >
+            <div className="w-9 h-9 rounded-xl bg-neutral-800 flex items-center justify-center">
+              <MessageSquare size={18} className="text-blue-400" />
+            </div>
+            <p className="font-bold text-white text-sm">Чаты</p>
+            <p className="text-xs text-neutral-500">Друзья и группы</p>
+          </button>
+        </motion.div>
 
         {/* 4. Settings + Gallery row */}
         <motion.div
