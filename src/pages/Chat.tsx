@@ -198,15 +198,22 @@ export default function Chat() {
     if (!chatKey) return;
     if (friendName && !friendTelegramId && !isDanil) return; // DM — wait for friend's telegram_id
 
-    // Helper to decode content that may contain [img]: prefix
+    // Helper to decode content that may contain [img]: or [pvp]: prefix
     const decodeContent = (raw: string) => {
       if (raw.startsWith('[img]:')) {
         const rest = raw.slice(6);
         const nlIdx = rest.indexOf('\n');
-        if (nlIdx >= 0) return { imageUrl: rest.slice(0, nlIdx), text: rest.slice(nlIdx + 1) };
-        return { imageUrl: rest, text: '' };
+        if (nlIdx >= 0) return { imageUrl: rest.slice(0, nlIdx), text: rest.slice(nlIdx + 1), pvpRoomId: undefined };
+        return { imageUrl: rest, text: '', pvpRoomId: undefined };
       }
-      return { imageUrl: undefined, text: raw };
+      if (raw.startsWith('[pvp]:')) {
+        const rest = raw.slice(6);
+        const nlIdx = rest.indexOf('\n');
+        const roomId = nlIdx >= 0 ? rest.slice(0, nlIdx) : rest;
+        const text = nlIdx >= 0 ? rest.slice(nlIdx + 1) : '';
+        return { imageUrl: undefined, text, pvpRoomId: roomId };
+      }
+      return { imageUrl: undefined, text: raw, pvpRoomId: undefined };
     };
 
     let cancelled = false;
