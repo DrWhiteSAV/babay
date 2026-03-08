@@ -214,7 +214,7 @@ export default function Game() {
         bossImageReadyRef.current = true;
         setBossImageReady(true);
         // Save to gallery [bosses] via saveImageToGallery (unified approach)
-        const activeTgId = tgId ?? profile?.telegram_id;
+        const activeTgId = tgIdRef.current ?? tgId;
         console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
           saveImageToGallery(bResult.url, activeTgId, `[bosses] Босс ур.${bossLevel}`, bResult.prompt)
