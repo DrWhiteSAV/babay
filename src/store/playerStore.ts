@@ -233,12 +233,23 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   updateSettings: (newSettings) =>
     set((state) => {
       const updated = { ...state.settings, ...newSettings };
-      // Only auto-switch font if user explicitly changes theme AND has not set a custom font
-      if (newSettings.theme === "cyberpunk" && state.settings.theme !== "cyberpunk") {
-        updated.fontFamily = "Tektur";
+      // Auto-switch font when theme changes (only if user explicitly changes theme)
+      if (newSettings.theme && newSettings.theme !== state.settings.theme) {
+        const themeDefaultFont: Record<string, import("./playerStore").FontFamily> = {
+          cyberpunk: "Tektur",
+          horror: "Rubik Beastly",
+          steampunk: "Playfair Display",
+          anime: "Montserrat",
+          soviet: "Russo One",
+          fairytale: "Ruslan Display",
+          cartoon: "Neucha",
+          fantasy: "Ruslan Display",
+          normal: "Russo One",
+        };
+        if (themeDefaultFont[newSettings.theme]) {
+          updated.fontFamily = themeDefaultFont[newSettings.theme];
+        }
       }
-      // NOTE: switching back to 'normal' theme does NOT reset fontFamily
-      // so user's chosen font is preserved
       return { settings: updated };
     }),
   setGlobalBackgroundUrl: (url) => set({ globalBackgroundUrl: url }),
