@@ -418,8 +418,9 @@ export const usePlayerStore = create<PlayerState>()(
   ),
 );
 
-// Invalidate old cache key on startup
+// Invalidate old cache keys on startup
 if (typeof window !== "undefined") {
   try { localStorage.removeItem("babai-ui-prefs"); } catch {}
+  try { localStorage.removeItem("babai-ui-prefs-v2"); } catch {}
 }
 
