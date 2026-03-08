@@ -906,8 +906,11 @@ export default function Game() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              if (pvpParticipants.length > 0) { setExitedEarly(true); setIsGameOver(true); }
-              else navigate("/hub");
+              if (pvpRoomId || pvpParticipants.length > 0) {
+                exitedEarlyRef.current = true;
+                setExitedEarly(true);
+                setIsGameOver(true);
+              } else navigate("/hub");
             }}
             className="p-2 bg-neutral-900/80 rounded-full hover:bg-neutral-800 transition-colors"
           >
