@@ -231,9 +231,9 @@ export default function Game() {
       }
     }, 1000);
 
-    // Generate boss image in background
-    await generateBossImageWithSave(currentStage, charData);
-  }, [difficulty]);
+    // Generate boss image in background (don't await — runs concurrently with countdown)
+    generateBossImageWithSave(currentStage, charData);
+  }, [difficulty, generateBossImageWithSave]);
 
   const generateBossImageWithSave = useCallback(async (currentStage: number, charData: Record<string, string>) => {
     if (!character) return;
