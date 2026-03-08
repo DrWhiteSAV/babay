@@ -112,7 +112,7 @@ export default function Settings() {
         energy: snap.energy,
         boss_level: snap.boss_level,
         telekinesis_level: snap.telekinesis_level,
-        custom_settings: snap.custom_settings || {},
+        custom_settings: (snap.custom_settings || {}) as unknown as import("../integrations/supabase/types").Json,
         game_status: snap.character_name ? "playing" : "reset",
       }).eq("telegram_id", telegramId);
 
