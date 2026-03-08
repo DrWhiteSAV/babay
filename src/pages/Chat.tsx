@@ -94,6 +94,7 @@ export default function Chat() {
   const [pendingRetry, setPendingRetry] = useState<PendingRetry | null>(null);
   const aiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const aiResolvedRef = useRef(false);
+  const lastAutoRespondedIdRef = useRef<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
