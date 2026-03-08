@@ -398,22 +398,31 @@ export default function CharacterCreate() {
     clearInterval(interval);
   }, [tgId]);
 
-  const handleStyleSelect = async (s: Style) => {
-    setStyle(s);
-    if (!gender || loreLocked) return;
-    pendingStyleRef.current = s;
-    const name = generatedName || (gender === "Бабай" ? "Бурьяник" : "Тьмарица");
-    await doGenerateLore(s, gender, name);
+  // Maps style names to theme keys for live preview
+  const styleToTheme: Record<Style, string> = {
+    "Фотореализм": "normal",
+    "Хоррор": "horror",
+    "Стимпанк": "steampunk",
+    "Киберпанк": "cyberpunk",
+    "Аниме": "anime",
+    "Постсоветский": "soviet",
+    "Русская сказка": "fairytale",
+    "2D мультфильм": "cartoon",
+    "Фентези деревня": "fantasy",
   };
 
-  const handleRetryLore = async () => {
-    const s = pendingStyleRef.current || style;
-    const g = gender;
-    if (!s || !g) return;
-    setLoreTimeout(false);
-    setLoreLocked(false);
-    const name = generatedName || (g === "Бабай" ? "Бурьяник" : "Тьмарица");
-    await doGenerateLore(s, g, name);
+  const handleStyleSelect = (s: Style) => {
+    setStyle(s);
+    pendingStyleRef.current = s;
+    // Switch the app theme live — exactly like Settings does
+    const { updateSettings } = usePlayerStore.getState();
+    updateSettings({ theme: styleToTheme[s] as any });
+  };
+
+  const handleCreateLore = async () => {
+    if (!style || !gender || loreLocked) return;
+    const name = generatedName || (gender === "Бабай" ? "Бурьяник" : "Тьмарица");
+    await doGenerateLore(style, gender, name);
   };
 
   const doGenerateAvatar = useCallback(async (currentGender: Gender, currentStyle: Style, currentName: string, currentWishes: string[], currentLore: string, isRetry = false) => {
