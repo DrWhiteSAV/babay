@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePlayerStore, ButtonSize, FontFamily, Theme } from "../store/playerStore";
+import { usePlayerStore, ButtonSize, FontFamily, Theme, DEFAULT_SETTINGS } from "../store/playerStore";
 import { motion } from "motion/react";
 import {
   Settings as SettingsIcon,
@@ -16,16 +16,6 @@ import {
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
 import Header from "../components/Header";
-
-const DEFAULT_SETTINGS = {
-  buttonSize: "small" as ButtonSize,
-  fontFamily: "JetBrains Mono" as FontFamily,
-  fontSize: 12,
-  fontBrightness: 100,
-  theme: "normal" as Theme,
-  musicVolume: 50,
-  ttsEnabled: false,
-};
 
 export default function Settings() {
   const navigate = useNavigate();
