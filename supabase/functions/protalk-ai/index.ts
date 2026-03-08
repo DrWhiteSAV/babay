@@ -73,7 +73,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { type, prompt, telegramId } = body;
+    const { type, prompt, telegramId, chatKey } = body;
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "prompt is required" }), {
@@ -82,7 +82,11 @@ serve(async (req) => {
       });
     }
 
-    const chatId = generateChatId(telegramId, PROTALK_BOT_ID);
+    // Use chatKey-based stable chat_id if provided (prevents per-user LIMIT errors).
+    // Otherwise fall back to telegramId-based chat_id.
+    const chatId = chatKey
+      ? `ck_${String(chatKey).replace(/[^a-z0-9_]/gi, "_")}`
+      : generateChatId(telegramId, PROTALK_BOT_ID);
     const socialId = generateSocialId(telegramId);
     const botIdNum = parseInt(PROTALK_BOT_ID);
 
