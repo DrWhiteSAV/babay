@@ -642,6 +642,14 @@ export default function Chat() {
                   >{msg.sender}</span>
                 )}
 
+                {/* AI-generated badge */}
+                {msg.isAiGenerated && (
+                  <div className={`flex items-center gap-1 mb-1 ${isUser ? "mr-1" : "ml-1"}`}>
+                    <Bot size={10} className="text-green-400" />
+                    <span className="text-[9px] text-green-400 font-semibold tracking-wide">ИИ-заместитель</span>
+                  </div>
+                )}
+
                 <div className="flex items-end gap-1.5 group/msg">
                   {/* Reply button on hover (outgoing) */}
                   {isUser && (
