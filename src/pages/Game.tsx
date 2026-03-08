@@ -54,9 +54,13 @@ export default function Game() {
   const [showSuccessAvatar, setShowSuccessAvatar] = useState(false);
   const [showCutscene, setShowCutscene] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [aiRetry, setAiRetry] = useState(false); // show "AI тупит" button
+  const aiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [pendingRetryStage, setPendingRetryStage] = useState<number | null>(null);
 
   // Game phase: after difficulty chosen but before world is generated
   const [isGeneratingWorld, setIsGeneratingWorld] = useState(false);
+
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -144,7 +148,7 @@ export default function Game() {
   };
 
   const startGame = async (diff: Difficulty) => {
-    const cost = diff === "Сложная" ? 1 : diff === "Невозможная" ? 5 : 25;
+    const cost = diff === "Сложная" ? 3 : diff === "Невозможная" ? 15 : 50;
     if (!useEnergy(cost)) {
       alert("Недостаточно энергии!");
       return;
@@ -161,13 +165,12 @@ export default function Game() {
     setExitedEarly(false);
     setPvpResults(null);
     setIsGameOver(false);
-    // No cutscene - go straight to world generation
 
     // Set default background immediately from admin panel
     const defaultBg = getDefaultGameBg();
     setBgImage(defaultBg);
 
-    // Now generate world background ONCE before first stage
+    // Phase 1: Generate world background FIRST, then load stage text
     if (character) {
       setIsGeneratingWorld(true);
       setBgGenStatus("generating");
@@ -189,15 +192,16 @@ export default function Game() {
       };
 
       try {
-        // Generate BG image separately (no concurrent text gen)
-        const bgResult = await generateBackgroundImage(1, character.style, charData, tgId);
-        if (bgResult.url && bgResult.url.startsWith("http")) {
-          setBgImage(bgResult.url);
-          addToGallery(bgResult.url);
-          // Save to gallery DB via ImgBB
-        if (tgId) {
-          saveImageToGallery(bgResult.url, tgId, `[backgrounds] Фон игры: ${diff}`, bgResult.prompt).catch(console.error);
-        }
+        // 30s timeout for background generation
+        const bgPromise = generateBackgroundImage(1, character.style, charData, tgId);
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
+        const bgResult = await Promise.race([bgPromise, timeoutPromise]);
+        
+        if (bgResult && (bgResult as any).url && (bgResult as any).url.startsWith("http")) {
+          setBgImage((bgResult as any).url);
+          if (tgId) {
+            saveImageToGallery((bgResult as any).url, tgId, `[backgrounds] Фон игры: ${diff}`, (bgResult as any).prompt).catch(console.error);
+          }
         }
       } catch (e) {
         console.warn("[Game] world bg gen failed, using default:", e);
@@ -207,8 +211,10 @@ export default function Game() {
       setIsGeneratingWorld(false);
     }
 
+    // Phase 2: Load first stage text AFTER background is ready
     await loadNextStage(1);
   };
+
 
   const getBossTimeBonus = () => {
     if (inventory.includes("pajama_star")) return 15;
@@ -244,37 +250,42 @@ export default function Game() {
       telegram_id: String(profile?.telegram_id || ""),
     } : {};
 
-    // Boss Battle check (stage 16)
+    // Boss Battle check (stage 16) — no cutscene, generate image then start timer
     if (currentStage === 16) {
-      setShowCutscene(true);
-      // Wait for cutscene to complete (at least 3s) then generate boss image
       setBossTaps(0);
       setBossTimer(0); // Timer not started yet
       setIsBossDefeated(false);
       setBossImage(""); // Clear previous boss image
       setIsLoading(true);
+      setIsBossBattle(true); // Show boss UI while generating
 
       if (character) {
-        // Wait for cutscene + generate boss image in parallel
-        const [bResult] = await Promise.all([
-          generateBossImage(currentStage, character.style, charData, tgId),
-          new Promise(r => setTimeout(r, 3000)), // min cutscene wait
-        ]);
-        const typedResult = bResult as { url: string; prompt: string };
-        setBossImage(typedResult.url);
-        // Save boss image to gallery via ImgBB/save-to-gallery
-        if (tgId) {
-          saveImageToGallery(typedResult.url, tgId, `[bosses] Босс уровня ${bossLevel}`, typedResult.prompt).catch(console.error);
+        let retryCount = 0;
+        let bossUrl = "";
+        while (!bossUrl && retryCount < 3) {
+          try {
+            const bResult = await generateBossImage(currentStage, character.style, charData, tgId) as { url: string; prompt: string };
+            if (bResult.url && bResult.url.startsWith("http")) {
+              bossUrl = bResult.url;
+              setBossImage(bossUrl);
+              if (tgId) {
+                saveImageToGallery(bossUrl, tgId, `[bosses] Босс уровня ${bossLevel}`, bResult.prompt).catch(console.error);
+              }
+            }
+          } catch (e) {
+            console.warn("[Game] boss image retry", retryCount, e);
+          }
+          retryCount++;
         }
-        // Small delay for page to render the boss image before starting timer
+        // Wait 1s for render then start timer
         await new Promise(r => setTimeout(r, 1000));
       }
 
-      setIsBossBattle(true);
       setBossTimer(30 + getBossTimeBonus()); // Start timer AFTER image loaded
       setIsLoading(false);
       return;
     }
+
 
     // Check if it's Danil chat time (every 5th stage, starting from stage 5)
     if (currentStage > 1 && currentStage % 5 === 0) {
@@ -290,40 +301,45 @@ export default function Game() {
     }
 
     if (character) {
-      // Generate scenario text (separately from any image generation)
-      const newScenario = await generateScenario(
-        currentStage,
-        difficulty || "Сложная",
-        character.style,
-        tgId,
-      );
-      setScenario(newScenario);
+      setAiRetry(false);
+      setPendingRetryStage(currentStage);
+      // 30s timeout — show retry button if no response
+      if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+      aiTimeoutRef.current = setTimeout(() => {
+        setAiRetry(true);
+        setIsLoading(false);
+      }, 30000);
 
-      // Generate spooky voice for the scenario
-      if (settings.ttsEnabled) {
-        generateSpookyVoice(newScenario.text).then((audioData) => {
-          if (audioData && audioRef.current && !isLoading) {
-            audioRef.current.src = audioData;
-            const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
-            if (hasInteracted) {
-              audioRef.current
-                .play()
-                .catch((e) => console.log("Audio play blocked", e));
+      try {
+        const newScenario = await generateScenario(
+          currentStage,
+          difficulty || "Сложная",
+          character.style,
+          tgId,
+        );
+        clearTimeout(aiTimeoutRef.current!);
+        setAiRetry(false);
+
+        if (!newScenario?.text || !newScenario?.options?.length) {
+          setAiRetry(true);
+          setIsLoading(false);
+          return;
+        }
+        setScenario(newScenario);
+
+        if (settings.ttsEnabled) {
+          generateSpookyVoice(newScenario.text).then((audioData) => {
+            if (audioData && audioRef.current) {
+              audioRef.current.src = audioData;
+              audioRef.current.play().catch(() => {});
             }
-          } else if (!audioData && !isLoading) {
-            if ('speechSynthesis' in window) {
-              const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
-              if (hasInteracted) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(newScenario.text);
-                utterance.lang = 'ru-RU';
-                utterance.pitch = 0.5;
-                utterance.rate = 0.9;
-                window.speechSynthesis.speak(utterance);
-              }
-            }
-          }
-        });
+          });
+        }
+      } catch (e) {
+        clearTimeout(aiTimeoutRef.current!);
+        setAiRetry(true);
+        setIsLoading(false);
+        return;
       }
     }
     setIsLoading(false);
@@ -438,11 +454,12 @@ export default function Game() {
   };
 
   const startPvpGame = async (diff: Difficulty) => {
-    const cost = diff === "Сложная" ? 1 : diff === "Невозможная" ? 5 : 25;
+    const cost = diff === "Сложная" ? 3 : diff === "Невозможная" ? 15 : 50;
     if (!useEnergy(cost)) {
       alert("Недостаточно энергии!");
       return;
     }
+
 
     setDifficulty(diff);
     setMaxStages(diff === "Сложная" ? 15 : diff === "Невозможная" ? 45 : Infinity);
