@@ -912,6 +912,80 @@ export type Database = {
         }
         Relationships: []
       }
+      pvp_room_members: {
+        Row: {
+          avatar_url: string | null
+          character_name: string | null
+          finished_at: string | null
+          id: string
+          joined_at: string
+          room_id: string
+          score: number
+          status: string
+          telegram_id: number
+        }
+        Insert: {
+          avatar_url?: string | null
+          character_name?: string | null
+          finished_at?: string | null
+          id?: string
+          joined_at?: string
+          room_id: string
+          score?: number
+          status?: string
+          telegram_id: number
+        }
+        Update: {
+          avatar_url?: string | null
+          character_name?: string | null
+          finished_at?: string | null
+          id?: string
+          joined_at?: string
+          room_id?: string
+          score?: number
+          status?: string
+          telegram_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pvp_room_members_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "pvp_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pvp_rooms: {
+        Row: {
+          created_at: string
+          difficulty: string
+          id: string
+          organizer_telegram_id: number
+          started_at: string | null
+          status: string
+          timer_ends_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string
+          id: string
+          organizer_telegram_id: number
+          started_at?: string | null
+          status?: string
+          timer_ends_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          id?: string
+          organizer_telegram_id?: number
+          started_at?: string | null
+          status?: string
+          timer_ends_at?: string | null
+        }
+        Relationships: []
+      }
       shop_items: {
         Row: {
           cost: number
