@@ -946,14 +946,9 @@ export default function Chat() {
                 <Bot size={15} className="text-green-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-green-300 block">ИИ-заместитель активен · отвечает за тебя</span>
-                  {aiSubCountdown > 0 && (
-                    <span className="text-[10px] text-green-500 font-mono">
-                      Ответит через <span className="text-green-300 font-bold">{aiSubCountdown}с</span>
-                    </span>
-                  )}
                 </div>
                 <button
-                  onClick={() => { toggleAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); }}
+                  onClick={() => { toggleAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); setAiSubTypingCountdown(0); if (aiSubBroadcastChannelRef.current) aiSubBroadcastChannelRef.current.send({ type: 'broadcast', event: 'ai_sub_typing', payload: { remaining: 0, senderTid: profile?.telegram_id } }); }}
                   className="text-green-400 hover:text-white text-xs font-bold shrink-0"
                 >Выкл</button>
               </motion.div>
