@@ -280,8 +280,8 @@ export default function Game() {
   const retryBossImageGen = useCallback((currentStage: number) => {
     setBossGenRetry(false);
     bossImageReadyRef.current = false;
-    setBossPreparationCountdown(60);
-    let countdown = 60;
+    setBossPreparationCountdown(120);
+    let countdown = 120;
     if (bossPreparationIntervalRef.current) clearInterval(bossPreparationIntervalRef.current);
     bossPreparationIntervalRef.current = setInterval(() => {
       countdown -= 1;
