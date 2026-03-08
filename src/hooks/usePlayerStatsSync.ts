@@ -63,6 +63,9 @@ export function usePlayerStatsSync() {
   const { profile } = useTelegram();
   const activeTelegramId = useRef<number | null>(null);
   const lastKnownAvatarUrl = useRef<string>(FALLBACK_AVATAR);
+  // Timestamp when DB load completed — we block all writes for 5s after load
+  // to prevent energy regen / other instant state changes from overwriting fresh DB data
+  const dbLoadedAtRef = useRef<number>(0);
 
   // ─── LOAD FROM DB — always overwrites localStorage/cache ───────────────────
   useEffect(() => {
