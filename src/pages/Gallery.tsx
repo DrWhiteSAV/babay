@@ -25,26 +25,48 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("all");
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const tgId = profile?.telegram_id;
-      if (tgId) {
-        const { data, error } = await supabase
-          .from("gallery")
-          .select("id, image_url, label, created_at")
-          .eq("telegram_id", tgId)
-          .order("created_at", { ascending: false });
-        if (error) console.error("[Gallery] load error:", error);
-        if (data) {
-          console.log("[Gallery] loaded items:", data.length, data.map(d => d.label));
-          setItems(data);
-        }
-      }
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const isRenderableImageUrl = (url: string | null | undefined) =>
+    typeof url === "string" && /^https?:\/\//i.test(url.trim());
+
+  const loadGallery = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    const tgId = profile?.telegram_id;
+    if (!tgId) {
+      setItems([]);
       setLoading(false);
-    };
-    load();
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("gallery")
+      .select("id, image_url, label, created_at")
+      .eq("telegram_id", tgId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Gallery] load error:", error);
+      setLoadError("Не удалось загрузить галерею из базы данных");
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    const normalized = (data || [])
+      .filter((row) => isRenderableImageUrl(row.image_url))
+      .map((row) => ({ ...row, image_url: row.image_url.trim() }));
+
+    setItems(normalized);
+    usePlayerStore.setState({ gallery: normalized.map((item) => item.image_url) });
+    setLoading(false);
   }, [profile?.telegram_id]);
+
+  useEffect(() => {
+    loadGallery();
+  }, [loadGallery]);
 
   const getCategory = (item: GalleryItem): Section => {
     const label = (item.label || "").toLowerCase();
