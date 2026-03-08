@@ -392,6 +392,19 @@ export default function Friends() {
 
       <Header title={<><Users size={20} /> Друзья</>} backUrl="/hub" />
 
+      {/* Quick chats link */}
+      <div className="px-6 pt-3 pb-0 relative z-10">
+        <button
+          onClick={() => navigate("/chats")}
+          className="w-full flex items-center justify-between bg-neutral-900/80 border border-neutral-800 hover:border-blue-900/50 rounded-xl px-4 py-3 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm text-neutral-300 font-bold">
+            <MessageSquare size={16} className="text-blue-400" /> Открыть все чаты
+          </span>
+          <span className="text-xs text-neutral-500">→</span>
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-6 space-y-8 relative z-10">
 
         {/* Referral Section */}
