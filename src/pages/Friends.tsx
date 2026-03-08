@@ -185,6 +185,10 @@ export default function Friends() {
         friend_telegram_id: foundUser.telegram_id,
       }, { onConflict: "telegram_id,friend_name" });
       if (error) console.error("Friend save error:", error);
+      else {
+        // Notify the added person in Telegram
+        notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
+      }
     }
     setNewFriendInput("");
     setSearchStatus("idle");
