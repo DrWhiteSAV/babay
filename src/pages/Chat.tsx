@@ -328,22 +328,22 @@ export default function Chat() {
     setAiCountdown(0);
   }, []);
 
-  const saveMessageToDB = async (msg: Message, role: string, senderName: string) => {
-    if (!chatKey) return;
+  const saveMessageToDB = async (msg: Message, role: string, senderName: string): Promise<string | null> => {
+    if (!chatKey) return null;
     // Encode imageUrl into content using [img]: prefix so it persists in DB
     let content = msg.text || '';
     if (msg.imageUrl) content = `[img]:${msg.imageUrl}\n${content}`;
-    await supabase.from("chat_messages").insert({
+    const { data: inserted } = await supabase.from("chat_messages").insert({
       telegram_id: profile?.telegram_id || 0,
       content,
       role,
       friend_name: senderName,
       chat_key: chatKey,
       sender_telegram_id: role === 'user' ? profile?.telegram_id : null,
-    } as any);
+    } as any).select('id').single();
 
     // Notify recipient via Telegram if they're offline (only for user-sent messages)
-    if (role !== 'user') return;
+    if (role !== 'user') return inserted?.id || null;
     const myName = character?.name || senderName;
     const previewText = msg.imageUrl ? "📷 Фото" : (msg.text || "").slice(0, 100);
 
@@ -356,14 +356,10 @@ export default function Chat() {
         );
       }
     } else if (group) {
-      // For group chats: notify all real (non-AI) members that are offline
-      // Check if message is a @mention or a reply
       const isMention = (name: string) => msg.text?.includes(`@${name}`);
       const isReply = !!msg.replyTo;
-
-      // Fetch telegram_ids of group members
       const memberNames = group.members.filter(m => m !== "ДанИИл" && m !== character?.name);
-      if (memberNames.length === 0) return;
+      if (memberNames.length === 0) return inserted?.id || null;
       const { data: memberStats } = await supabase
         .from("player_stats")
         .select("telegram_id, character_name")
@@ -382,6 +378,7 @@ export default function Chat() {
         }
       }
     }
+    return inserted?.id || null;
   };
 
   const doAiReply = useCallback(async (
@@ -391,6 +388,7 @@ export default function Chat() {
     responder: string,
     recentMessages: { sender: string; text: string }[],
     isRetry = false,
+    isSubstituteCall = false,
   ) => {
     setIsAiTyping(true);
     setAiTimedOut(false);
@@ -410,9 +408,14 @@ export default function Chat() {
         setPendingRetry({ userMessage, imageToSend, replyToMsgId, responder, recentMessages });
         return;
       }
-      const aiMsg: Message = { id: Date.now().toString(), sender: responder, text: responseText, replyTo: replyToMsgId || undefined };
+      const tempId = `pending_ai_${Date.now()}`;
+      const aiMsg: Message = { id: tempId, sender: responder, text: responseText, replyTo: replyToMsgId || undefined, isAiGenerated: isSubstituteCall };
       setMessages(prev => [...prev, aiMsg]);
-      await saveMessageToDB(aiMsg, 'assistant', responder);
+      const dbId = await saveMessageToDB(aiMsg, 'assistant', responder);
+      // Replace temp ID with real DB UUID to prevent realtime duplication
+      if (dbId) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
+      }
       setPendingRetry(null);
     } catch (e) {
       stopAiCountdown();
