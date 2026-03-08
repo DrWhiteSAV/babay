@@ -91,8 +91,8 @@ export default function Profile() {
     setIsGeneratingLore(false);
   };
 
-  const latinName = transliterate(character.name).replace(/\s+/g, "").toLowerCase();
-  const referralLink = `https://t.me/Bab_AIbot/app?startapp=${latinName}`;
+  const referralLink = `https://t.me/Bab_AIbot/app?startapp=${profile?.telegram_id || ""}`;
+
 
   const handleCopyRef = () => {
     navigator.clipboard.writeText(referralLink);
