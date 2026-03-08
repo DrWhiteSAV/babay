@@ -70,7 +70,12 @@ export default function Chat() {
   const { profile } = useTelegram();
   const friendName = location.state?.friendName;
   const groupId = location.state?.groupId;
-  const friend = friends.find(f => f.name === friendName);
+  // ДанИИл is always a built-in AI friend — ensure isAiEnabled is always true for him
+  const rawFriend = friends.find(f => f.name === friendName);
+  const isDanil = friendName === "ДанИИл";
+  const friend = isDanil
+    ? (rawFriend ? { ...rawFriend, isAiEnabled: true } : { name: "ДанИИл", isAiEnabled: true })
+    : rawFriend;
   const group = groupChats.find(g => g.id === groupId);
 
   const [messages, setMessages] = useState<Message[]>([]);
