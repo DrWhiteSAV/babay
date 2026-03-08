@@ -40,7 +40,7 @@ type FilterMode = "all" | "friends" | "groups";
 
 export default function Chats() {
   const navigate = useNavigate();
-  const { character, friends, groupChats, updateGroupName, deleteGroupChat, createGroupChat } = usePlayerStore();
+  const { character, friends, groupChats, updateGroupName, deleteGroupChat, createGroupChat, toggleFriendAi } = usePlayerStore();
   const { profile } = useTelegram();
 
   const [search, setSearch] = useState("");
@@ -353,6 +353,28 @@ export default function Chats() {
                     <p className="text-[11px] text-neutral-500 truncate mt-0.5">{item.lastMsg.text}</p>
                   )}
                 </button>
+
+                {/* DM AI toggle */}
+                {item.type === "dm" && (() => {
+                  const friendObj = friends.find(f => f.name === item.name);
+                  return (
+                    <button
+                      onClick={async () => {
+                        if (!friendObj) return;
+                        const newVal = !friendObj.isAiEnabled;
+                        toggleFriendAi(item.name);
+                        if (profile?.telegram_id) {
+                          await supabase.from("friends").update({ ai_substitute: newVal } as any)
+                            .eq("telegram_id", profile.telegram_id).eq("friend_name", item.name);
+                        }
+                      }}
+                      title={friendObj?.isAiEnabled ? "ИИ-заместитель включён" : "ИИ-заместитель выключен"}
+                      className={`p-2 rounded-lg transition-all shrink-0 ${friendObj?.isAiEnabled ? "bg-green-900/50 text-green-400 shadow-[0_0_6px_rgba(74,222,128,0.4)]" : "bg-neutral-800 text-neutral-600 hover:text-neutral-400"}`}
+                    >
+                      <Bot size={15} />
+                    </button>
+                  );
+                })()}
 
                 {/* Group actions */}
                 {item.type === "group" && (

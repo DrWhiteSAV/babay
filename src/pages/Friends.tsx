@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
-import { Users, UserPlus, Zap, MessageSquare, Link, Copy, Plus, X, Trash2, Edit2, CheckCircle, AlertCircle, Loader2, Bot } from "lucide-react";
+import { Users, UserPlus, Zap, MessageSquare, Link, Copy, Plus, X, Trash2, Edit2, CheckCircle, AlertCircle, Loader2, Bot, Search } from "lucide-react";
 import Header from "../components/Header";
 import ProfilePopup from "../components/ProfilePopup";
 import { useTelegram } from "../context/TelegramContext";
@@ -71,6 +71,7 @@ export default function Friends() {
   const [energyModal, setEnergyModal] = useState<{ friendName: string; telegramId?: number } | null>(null);
   const [energyAmount, setEnergyAmount] = useState(10);
   const [energySending, setEnergySending] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
 
   // Collect all friend telegram IDs for online status polling
   const friendTelegramIds = useMemo(
@@ -392,16 +393,15 @@ export default function Friends() {
 
       <Header title={<><Users size={20} /> Друзья</>} backUrl="/hub" />
 
-      {/* Quick chats link */}
+      {/* Big Chats button */}
       <div className="px-6 pt-3 pb-0 relative z-10">
         <button
           onClick={() => navigate("/chats")}
-          className="w-full flex items-center justify-between bg-neutral-900/80 border border-neutral-800 hover:border-blue-900/50 rounded-xl px-4 py-3 transition-colors"
+          className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-blue-900/80 to-blue-800/60 hover:from-blue-800/90 hover:to-blue-700/70 border border-blue-700/50 hover:border-blue-500/70 rounded-2xl px-5 py-4 transition-all shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:shadow-[0_0_28px_rgba(59,130,246,0.35)] active:scale-[0.98]"
         >
-          <span className="flex items-center gap-2 text-sm text-neutral-300 font-bold">
-            <MessageSquare size={16} className="text-blue-400" /> Открыть все чаты
-          </span>
-          <span className="text-xs text-neutral-500">→</span>
+          <MessageSquare size={22} className="text-blue-300" />
+          <span className="text-base font-black text-white tracking-wide">Чаты</span>
+          <span className="ml-auto text-xs text-blue-400 font-semibold">Открыть →</span>
         </button>
       </div>
 
@@ -531,9 +531,27 @@ export default function Friends() {
 
         {/* Friends List */}
         <section>
-          <h2 className="text-lg font-bold mb-4 text-white">Список друзей ({friends.length})</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-lg font-bold text-white">Список друзей ({friends.length})</h2>
+          </div>
+          {/* Search among existing friends */}
+          <div className="relative mb-4">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
+            <input
+              value={friendSearch}
+              onChange={e => setFriendSearch(e.target.value)}
+              placeholder="Поиск по друзьям..."
+              className="w-full bg-neutral-900/80 border border-neutral-800 rounded-xl pl-9 pr-9 py-2.5 text-sm text-white focus:outline-none focus:border-red-900/50 transition-colors placeholder-neutral-600"
+            />
+            {friendSearch && (
+              <button onClick={() => setFriendSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <div className="space-y-3">
             {/* ДанИИл block */}
+            {(!friendSearch || "ДанИИл".toLowerCase().includes(friendSearch.toLowerCase())) && (
             <div className="bg-neutral-900/80 backdrop-blur-md p-3 rounded-xl border border-green-900/30 flex flex-col gap-2">
               <div className="flex items-center gap-2 w-full min-w-0">
                 <div className="relative shrink-0">
@@ -560,27 +578,25 @@ export default function Friends() {
                     className="p-2 bg-neutral-800 hover:bg-yellow-900/40 rounded-lg text-yellow-500 transition-colors"
                     title="Поделиться энергией"
                   ><Zap size={15} /></button>
-                  <button
-                    onClick={() => navigate("/chat", { state: { friendName: "ДанИИл" } })}
-                    className="relative p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-blue-400 transition-colors"
-                    title="Чат"
-                  >
-                    <MessageSquare size={15} />
-                  </button>
                 </div>
               </div>
             </div>
+            )}
 
             {/* Regular friends */}
-            {friends.filter(f => f.name !== "ДанИИл").map((friend) => {
+            {friends.filter(f => f.name !== "ДанИИл").filter(f => {
+              if (!friendSearch) return true;
+              const sq = friendSearch.toLowerCase();
+              const meta = friendsMeta[f.name] || {};
+              return f.name.toLowerCase().includes(sq)
+                || (meta.first_name || "").toLowerCase().includes(sq)
+                || (meta.last_name || "").toLowerCase().includes(sq)
+                || (meta.username || "").toLowerCase().includes(sq);
+            }).map((friend) => {
               const meta = friendsMeta[friend.name] || {};
               const avatarSrc = meta.avatar_url || `https://picsum.photos/seed/${friend.name}/100/100`;
               const tgLink = meta.username ? `https://t.me/${meta.username}` : null;
               const isOnline = meta.telegram_id ? !!onlineMap[meta.telegram_id] : false;
-              const dmKey = meta.telegram_id
-                ? [String(profile?.telegram_id), String(meta.telegram_id)].sort().join("_")
-                : null;
-              const unread = dmKey ? (perChatUnread[dmKey] || 0) : 0;
 
               return (
                 <div key={friend.name} className="bg-neutral-900/80 backdrop-blur-md p-3 rounded-xl border border-neutral-800 flex flex-col gap-2">
@@ -613,36 +629,11 @@ export default function Friends() {
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0 items-center">
-                      {/* AI Substitute toggle */}
-                      <button
-                        onClick={async () => {
-                          const newVal = !friend.isAiEnabled;
-                          toggleFriendAi(friend.name);
-                          if (profile?.telegram_id) {
-                            await supabase.from("friends").update({ ai_substitute: newVal } as any)
-                              .eq("telegram_id", profile.telegram_id).eq("friend_name", friend.name);
-                          }
-                        }}
-                        title={friend.isAiEnabled ? "ИИ-заместитель включён" : "ИИ-заместитель выключен"}
-                        className={`p-2 rounded-lg transition-colors ${friend.isAiEnabled ? "bg-green-900/50 text-green-400 shadow-[0_0_6px_rgba(74,222,128,0.4)]" : "bg-neutral-800 text-neutral-600 hover:text-neutral-400"}`}
-                      ><Bot size={15} /></button>
                       <button
                         onClick={() => setEnergyModal({ friendName: friend.name, telegramId: meta.telegram_id })}
                         className="p-2 bg-neutral-800 hover:bg-yellow-900/40 rounded-lg text-yellow-500 transition-colors"
                         title="Поделиться энергией"
                       ><Zap size={15} /></button>
-                      <button
-                        onClick={() => navigate("/chat", { state: { friendName: friend.name } })}
-                        className="relative p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-blue-400 transition-colors"
-                        title="Чат"
-                      >
-                        <MessageSquare size={15} />
-                        {unread > 0 && (
-                          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none shadow-[0_0_6px_rgba(220,38,38,0.7)]">
-                            {unread > 99 ? "99+" : unread}
-                          </span>
-                        )}
-                      </button>
                       <button
                         onClick={async () => {
                           if (!confirm(`Удалить ${friend.name}?`)) return;
