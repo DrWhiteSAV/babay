@@ -480,11 +480,13 @@ export default function Settings() {
             className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
               savedOk
                 ? "bg-green-800 border border-green-600 text-green-300"
+                : saving
+                ? "bg-neutral-800 border border-neutral-700 text-neutral-400"
                 : "bg-red-900/30 hover:bg-red-900/50 border border-red-700 text-red-300"
             }`}
           >
             {saving ? <><Loader2 size={18} className="animate-spin" /> Сохранение...</> :
-             savedOk ? <>✓ Сохранено!</> :
+             savedOk ? <>✓ Сохранено автоматически</> :
              <><Save size={18} /> СОХРАНИТЬ НАСТРОЙКИ</>}
           </button>
         </section>
