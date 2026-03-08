@@ -537,6 +537,8 @@ export default function Friends() {
                             className="p-2 bg-neutral-800 hover:bg-red-900/50 rounded-lg text-red-500 transition-colors"
                           ><Trash2 size={15} /></button>
                         )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
