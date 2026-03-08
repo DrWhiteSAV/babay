@@ -141,9 +141,17 @@ export default function Settings() {
       lastEnergyUpdate: Date.now(),
       inventory: [],
       achievements: [],
-      friends: [{ name: "ДанИИл", isAiEnabled: true }],
+      friends: [],
       quests: [],
-      settings: { ...DEFAULT_SETTINGS },
+      settings: {
+        buttonSize: "small",
+        fontFamily: "Russo One",
+        fontSize: 12,
+        fontBrightness: 100,
+        theme: "normal",
+        musicVolume: 50,
+        ttsEnabled: false,
+      },
       dbLoaded: false,
     });
     setResetting(false);
