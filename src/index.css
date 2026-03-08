@@ -533,10 +533,11 @@ body {
   display: none;
 }
 
-/* ── FANTASY THEME ── */
+/* ── FANTASY THEME — Cinzel Decorative, средневековый стиль ── */
 .theme-fantasy {
   background-color: #0a0810 !important;
   color: #d8c8e8 !important;
+  font-family: "Cinzel Decorative", cursive !important;
 }
 .theme-fantasy [class*="bg-neutral-900"],
 .theme-fantasy [class*="bg-neutral-950"],
