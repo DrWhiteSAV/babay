@@ -355,36 +355,12 @@ export default function Chat() {
     if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
 
     const targetMsgId = lastMsg.id;
-    let remaining = AI_SUB_TIMEOUT;
-    // Show typing bubble locally for ourselves too
-    setAiSubTypingCountdown(remaining);
-    setAiSubCountdown(remaining);
-
-    // Broadcast to recipient that AI-sub is typing with countdown
-    const broadcastTyping = (rem: number) => {
-      const bc = aiSubBroadcastChannelRef.current;
-      if (bc) bc.send({ type: 'broadcast', event: 'ai_sub_typing', payload: { remaining: rem, senderTid: profile?.telegram_id } });
-    };
-    broadcastTyping(remaining);
-
-    aiSubIntervalRef.current = setInterval(() => {
-      remaining -= 1;
-      setAiSubCountdown(remaining);
-      setAiSubTypingCountdown(remaining);
-      broadcastTyping(remaining);
-      if (remaining <= 0) {
-        clearInterval(aiSubIntervalRef.current!);
-        setAiSubCountdown(0);
-        setAiSubTypingCountdown(0);
-        broadcastTyping(0);
-        if (lastAutoRespondedIdRef.current !== targetMsgId) {
-          lastAutoRespondedIdRef.current = targetMsgId;
-          const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-          // Reply AS ME to the friend's message
-          doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
-        }
-      }
-    }, 1000);
+    if (lastAutoRespondedIdRef.current !== targetMsgId) {
+      lastAutoRespondedIdRef.current = targetMsgId;
+      const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+      // Start AI reply immediately — the red AI countdown (AI_REPLY_TIMEOUT=30s) is the only timer
+      doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, isAiSubstitute, friend?.name, character?.name, chatKey, profile?.telegram_id]);
 
