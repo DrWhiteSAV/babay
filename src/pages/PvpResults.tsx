@@ -12,6 +12,7 @@ interface RoomMember {
   avatar_url: string | null;
   status: string;
   score: number;
+  watermelons: number;
   finished_at: string | null;
 }
 

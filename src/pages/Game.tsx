@@ -210,12 +210,14 @@ export default function Game() {
     setPvpSaved(true);
     pvpSavedRef.current = true;
     const finalScore = localFearRef.current;
+    const finalWatermelons = localWatermelonsRef.current;
     const exited = exitedEarlyRef.current;
-    console.log(`[DB WRITE] 📝 PVP finish: tgId=${tgId}, room=${pvpRoomId}, score=${finalScore}, exited=${exited}`);
+    console.log(`[DB WRITE] 📝 PVP finish: tgId=${tgId}, room=${pvpRoomId}, score=${finalScore}, watermelons=${finalWatermelons}, exited=${exited}`);
     (async () => {
       const { error } = await supabase.from("pvp_room_members").update({
         status: exited ? "timeout" : "finished",
         score: finalScore,
+        watermelons: exited ? 0 : finalWatermelons,
         finished_at: new Date().toISOString(),
       }).eq("room_id", pvpRoomId).eq("telegram_id", tgId);
       console.log(`[DB WRITE] 📝 pvp_room_members update result:`, error ? `ERROR: ${error.message}` : "OK");
