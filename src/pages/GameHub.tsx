@@ -15,12 +15,17 @@ import {
   MessageSquare,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
+import { usePvpLobby } from "../hooks/usePvpLobby";
+import PvpLobbyBanner from "../components/PvpLobbyBanner";
+import { useTelegram } from "../context/TelegramContext";
 
 export default function GameHub() {
   const navigate = useNavigate();
   const { character, dbLoaded, fear, watermelons, energy, lastEnergyUpdate, storeConfig } = usePlayerStore();
+  const { profile } = useTelegram();
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const pvpLobby = usePvpLobby(profile?.telegram_id);
 
   useEffect(() => {
     const calc = () => {
@@ -145,6 +150,17 @@ export default function GameHub() {
             ИГРАТЬ
           </button>
         </motion.div>
+
+        {/* 2.5. Active PVP Lobby Banner */}
+        {pvpLobby && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+          >
+            <PvpLobbyBanner lobby={pvpLobby} />
+          </motion.div>
+        )}
 
         {/* 3. Leaderboard + Chats row */}
         <motion.div
