@@ -249,7 +249,9 @@ export default function App() {
   return (
     <Router>
       <TelegramProvider>
-        <AppContent />
+        <AssetPreloaderProvider>
+          <AppContent />
+        </AssetPreloaderProvider>
       </TelegramProvider>
     </Router>
   );
