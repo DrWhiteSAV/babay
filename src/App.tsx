@@ -231,6 +231,8 @@ function AppContent() {
           <Route path="/admin/stat" element={<AdminStat />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/images" element={<AdminImages />} />
+          <Route path="/admin/events" element={<AdminEvents />} />
+          <Route path="/admin/achievements" element={<AdminAchievements />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BottomNav />
