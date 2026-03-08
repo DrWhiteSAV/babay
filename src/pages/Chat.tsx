@@ -498,7 +498,8 @@ export default function Chat() {
     if (dbId) {
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
     }
-    const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline);
+    // shouldUseAI: friend is AI-enabled and NOT in substitute mode (substitute handles reply flow separately)
+    const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline) && !isAiSubstitute;
     if (shouldUseAI) {
       const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
       const realMsgId = dbId || tempId;
