@@ -41,8 +41,8 @@ async function sendTelegramNotification(telegramId: number, text: string) {
   }
 }
 
-const AI_REPLY_TIMEOUT = 20;
-const AI_SUB_TIMEOUT = 30;
+const AI_REPLY_TIMEOUT = 25;
+const AI_SUB_TIMEOUT = 25;
 
 interface Message {
   id: string;
