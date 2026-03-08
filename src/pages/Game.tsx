@@ -244,37 +244,42 @@ export default function Game() {
       telegram_id: String(profile?.telegram_id || ""),
     } : {};
 
-    // Boss Battle check (stage 16)
+    // Boss Battle check (stage 16) — no cutscene, generate image then start timer
     if (currentStage === 16) {
-      setShowCutscene(true);
-      // Wait for cutscene to complete (at least 3s) then generate boss image
       setBossTaps(0);
       setBossTimer(0); // Timer not started yet
       setIsBossDefeated(false);
       setBossImage(""); // Clear previous boss image
       setIsLoading(true);
+      setIsBossBattle(true); // Show boss UI while generating
 
       if (character) {
-        // Wait for cutscene + generate boss image in parallel
-        const [bResult] = await Promise.all([
-          generateBossImage(currentStage, character.style, charData, tgId),
-          new Promise(r => setTimeout(r, 3000)), // min cutscene wait
-        ]);
-        const typedResult = bResult as { url: string; prompt: string };
-        setBossImage(typedResult.url);
-        // Save boss image to gallery via ImgBB/save-to-gallery
-        if (tgId) {
-          saveImageToGallery(typedResult.url, tgId, `[bosses] Босс уровня ${bossLevel}`, typedResult.prompt).catch(console.error);
+        let retryCount = 0;
+        let bossUrl = "";
+        while (!bossUrl && retryCount < 3) {
+          try {
+            const bResult = await generateBossImage(currentStage, character.style, charData, tgId) as { url: string; prompt: string };
+            if (bResult.url && bResult.url.startsWith("http")) {
+              bossUrl = bResult.url;
+              setBossImage(bossUrl);
+              if (tgId) {
+                saveImageToGallery(bossUrl, tgId, `[bosses] Босс уровня ${bossLevel}`, bResult.prompt).catch(console.error);
+              }
+            }
+          } catch (e) {
+            console.warn("[Game] boss image retry", retryCount, e);
+          }
+          retryCount++;
         }
-        // Small delay for page to render the boss image before starting timer
+        // Wait 1s for render then start timer
         await new Promise(r => setTimeout(r, 1000));
       }
 
-      setIsBossBattle(true);
       setBossTimer(30 + getBossTimeBonus()); // Start timer AFTER image loaded
       setIsLoading(false);
       return;
     }
+
 
     // Check if it's Danil chat time (every 5th stage, starting from stage 5)
     if (currentStage > 1 && currentStage % 5 === 0) {
