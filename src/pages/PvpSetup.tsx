@@ -15,7 +15,7 @@ interface FriendMeta {
   name: string;
   telegram_id?: number;
   character_name?: string | null;
-  avatar_url?: string;
+  avatar_url?: string | null;
 }
 
 function genRoomId() {
