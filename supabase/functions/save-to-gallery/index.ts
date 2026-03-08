@@ -42,7 +42,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageUrl, telegramId, label, prompt, lore, characterName } = await req.json();
+    const { imageUrl, telegramId, label, prompt, lore, characterName, wishes, style, gender } = await req.json();
 
     if (!imageUrl || !telegramId) {
       return new Response(JSON.stringify({ error: "imageUrl and telegramId are required" }), {
@@ -90,48 +90,106 @@ serve(async (req) => {
     const finalUrl = imgbbUrl || storageUrl || imageUrl;
     console.log(`[save-to-gallery] finalUrl: ${finalUrl}`);
 
-    // 4. Update player_stats for avatar images: avatar_url + character_name + lore
+    // 4. Determine if this is an avatar image
     const labelLower = (label || "").toLowerCase();
-    const isAvatar = labelLower.includes("[avatars]") || labelLower.includes("аватар") || labelLower.includes("avatar");
-    if (isAvatar) {
-      // Build targeted update — only include fields that are provided
-      const statsUpdate: Record<string, unknown> = { avatar_url: finalUrl };
-      // characterName passed explicitly from the client (clean name without "Аватар:" prefix)
-      if (characterName && typeof characterName === "string" && characterName.trim()) {
-        statsUpdate.character_name = characterName.trim();
-        console.log(`[save-to-gallery] setting character_name: ${characterName.trim()}`);
-      }
-      if (lore && typeof lore === "string" && lore.trim()) {
-        statsUpdate.lore = lore.trim();
-        console.log(`[save-to-gallery] setting lore: ${lore.substring(0, 80)}`);
-      }
-      const { error: statsError } = await supabase
-        .from("player_stats")
-        .update(statsUpdate)
-        .eq("telegram_id", telegramId);
-      if (statsError) console.error("[save-to-gallery] player_stats update error:", statsError);
-      else console.log("[save-to-gallery] Updated player_stats:", Object.keys(statsUpdate).join(", "));
+    const isAvatar = labelLower.includes("[avatars]") || labelLower.includes("[avatar]") || labelLower.includes("аватар") || labelLower.includes("avatar");
+
+    // Clean character name (remove any legacy prefixes)
+    const cleanName = (characterName || "")
+      .replace(/^Аватар:\s*/i, "")
+      .replace(/^\[.*?\]\s*/i, "")
+      .trim();
+
+    // Build canonical label: "[avatars] Name | Lore"
+    // This format allows Gallery to parse name and lore from the label
+    let canonicalLabel = label || null;
+    if (isAvatar && cleanName) {
+      canonicalLabel = lore
+        ? `[avatars] ${cleanName} | ${lore.substring(0, 200)}`
+        : `[avatars] ${cleanName}`;
+      console.log(`[save-to-gallery] canonical label: ${canonicalLabel.substring(0, 100)}`);
     }
 
     // 5. Save to gallery table
-    const { data, error } = await supabase
+    const { data: galleryItem, error: galleryError } = await supabase
       .from("gallery")
       .insert({
         telegram_id: telegramId,
         image_url: finalUrl,
-        label: label || null,
+        label: canonicalLabel,
         prompt: prompt || null,
       })
       .select()
       .single();
 
-    if (error) console.error("[save-to-gallery] gallery insert error:", error);
+    if (galleryError) console.error("[save-to-gallery] gallery insert error:", galleryError);
+    else console.log(`[DB WRITE] 📝 gallery INSERT for telegram_id=${telegramId}, label="${canonicalLabel?.substring(0, 80)}"`);
 
-    // 6. Send to Telegram
+    // 6. If avatar — save to avatars table AND update player_stats identity fields
+    if (isAvatar && cleanName) {
+      // Save to avatars table
+      const wishesArray = Array.isArray(wishes) ? wishes : [];
+      const { error: avatarTableError } = await supabase
+        .from("avatars")
+        .insert({
+          telegram_id: telegramId,
+          image_url: finalUrl,
+          name: cleanName,
+          lore: lore || null,
+          wishes: wishesArray,
+          style: style || null,
+          gender: gender || null,
+          gallery_item_id: galleryItem?.id || null,
+        });
+
+      if (avatarTableError) {
+        console.error("[save-to-gallery] avatars table insert error:", avatarTableError);
+      } else {
+        console.log(`[DB WRITE] 📝 avatars INSERT for telegram_id=${telegramId}, name="${cleanName}"`);
+      }
+
+      // Update player_stats: avatar_url + character_name + lore (identity fields only)
+      const statsUpdate: Record<string, unknown> = { avatar_url: finalUrl };
+      statsUpdate.character_name = cleanName;
+      if (lore && lore.trim()) statsUpdate.lore = lore.trim();
+      if (style) statsUpdate.character_style = style;
+      if (gender) statsUpdate.character_gender = gender;
+
+      const { error: statsError } = await supabase
+        .from("player_stats")
+        .update(statsUpdate)
+        .eq("telegram_id", telegramId);
+
+      if (statsError) {
+        console.error("[save-to-gallery] player_stats update error:", statsError);
+      } else {
+        console.log(`[DB WRITE] 📝 player_stats UPDATE identity for telegram_id=${telegramId}:`, Object.keys(statsUpdate).join(", "));
+      }
+
+      // Update custom_settings.wishes in player_stats if wishes provided
+      if (wishesArray.length > 0) {
+        const { data: existing } = await supabase
+          .from("player_stats")
+          .select("custom_settings")
+          .eq("telegram_id", telegramId)
+          .single();
+        const cs = existing?.custom_settings && typeof existing.custom_settings === "object"
+          ? existing.custom_settings as Record<string, unknown>
+          : {};
+        await supabase
+          .from("player_stats")
+          .update({ custom_settings: { ...cs, wishes: wishesArray } })
+          .eq("telegram_id", telegramId);
+        console.log(`[DB WRITE] 📝 player_stats UPDATE custom_settings.wishes for telegram_id=${telegramId}`);
+      }
+    }
+
+    // 7. Send to Telegram
     if (BOT_TOKEN) {
+      const displayName = cleanName || (label || "Бабай").replace(/^\[.*?\]\s*/i, "").replace(/^Аватар:\s*/i, "");
       const caption = lore
-        ? `🧟 *${(label || "Аватар Бабая").replace(/^\[.*?\]\s*/, "")}*\n\n${lore.substring(0, 900)}`
-        : `🖼 ${(label || "Бабай").replace(/^\[.*?\]\s*/, "")}`;
+        ? `🧟 *${displayName}*\n\n${lore.substring(0, 900)}`
+        : `🖼 ${displayName}`;
 
       const formData = new FormData();
       formData.append("chat_id", telegramId.toString());
@@ -149,7 +207,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      gallery_item: data || { image_url: finalUrl },
+      gallery_item: galleryItem || { image_url: finalUrl },
       storage_url: finalUrl,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
