@@ -35,6 +35,13 @@ export default function Friends() {
   const [energyAmount, setEnergyAmount] = useState(10);
   const [energySending, setEnergySending] = useState(false);
 
+  // Collect all friend telegram IDs for online status polling
+  const friendTelegramIds = useMemo(
+    () => Object.values(friendsMeta).map(m => m.telegram_id).filter(Boolean) as number[],
+    [friendsMeta]
+  );
+  const onlineMap = useFriendOnlineStatus(friendTelegramIds);
+
   useEffect(() => {
     if (!profile?.telegram_id) return;
     supabase
