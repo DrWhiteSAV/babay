@@ -29,6 +29,7 @@ export default function PvpSetup() {
   const [selected, setSelected] = useState<number[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!tgId || friends.length === 0) return;
@@ -181,6 +182,11 @@ export default function PvpSetup() {
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-full bg-red-700 flex items-center justify-center text-xs font-black">1</div>
             <h2 className="text-base font-bold uppercase tracking-wider">Выберите участников</h2>
+            {selected.length > 0 && (
+              <span className="ml-auto text-xs bg-red-700/80 text-white px-2 py-0.5 rounded-full font-bold">
+                {selected.length} выбрано
+              </span>
+            )}
           </div>
           {friendsMeta.length === 0 ? (
             <div className="p-4 bg-neutral-900/60 rounded-xl border border-neutral-800 text-center text-neutral-500 text-sm">
@@ -188,37 +194,73 @@ export default function PvpSetup() {
               У вас ещё нет друзей. Добавьте их на странице Друзья.
             </div>
           ) : (
-            <div className="space-y-2">
-              {friendsMeta.map(friend => {
-                const isSelected = selected.includes(friend.telegram_id!);
-                return (
+            <>
+              {/* Search */}
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Поиск по имени или персонажу..."
+                  className="w-full bg-neutral-900/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-500 outline-none focus:border-red-700 transition-colors"
+                />
+                {search && (
                   <button
-                    key={friend.telegram_id}
-                    onClick={() => toggleFriend(friend.telegram_id!)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                      isSelected
-                        ? "bg-red-900/40 border-red-600"
-                        : "bg-neutral-900/60 border-neutral-800 hover:border-neutral-600"
-                    }`}
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
                   >
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
-                      {friend.avatar_url ? (
-                        <img src={friend.avatar_url} alt={friend.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-lg">👻</div>
-                      )}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="font-bold text-sm">{friend.name}</div>
-                      {friend.character_name && (
-                        <div className="text-xs text-red-400">{friend.character_name}</div>
-                      )}
-                    </div>
-                    {isSelected && <Check size={18} className="text-red-400 shrink-0" />}
+                    ✕
                   </button>
-                );
-              })}
-            </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                {friendsMeta
+                  .filter(f => {
+                    if (!search.trim()) return true;
+                    const q = search.toLowerCase();
+                    return (
+                      f.name.toLowerCase().includes(q) ||
+                      (f.character_name || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map(friend => {
+                    const isSelected = selected.includes(friend.telegram_id!);
+                    return (
+                      <button
+                        key={friend.telegram_id}
+                        onClick={() => toggleFriend(friend.telegram_id!)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                          isSelected
+                            ? "bg-red-900/40 border-red-600"
+                            : "bg-neutral-900/60 border-neutral-800 hover:border-neutral-600"
+                        }`}
+                      >
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                          {friend.avatar_url ? (
+                            <img src={friend.avatar_url} alt={friend.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-lg">👻</div>
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-bold text-sm">{friend.name}</div>
+                          {friend.character_name && (
+                            <div className="text-xs text-red-400">{friend.character_name}</div>
+                          )}
+                        </div>
+                        {isSelected && <Check size={18} className="text-red-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                {friendsMeta.filter(f => {
+                  if (!search.trim()) return true;
+                  const q = search.toLowerCase();
+                  return f.name.toLowerCase().includes(q) || (f.character_name || "").toLowerCase().includes(q);
+                }).length === 0 && (
+                  <p className="text-center text-neutral-600 text-sm py-4">Никого не найдено</p>
+                )}
+              </div>
+            </>
           )}
         </section>
 
