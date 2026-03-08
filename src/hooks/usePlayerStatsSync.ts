@@ -7,7 +7,7 @@ const FALLBACK_AVATAR = "https://i.ibb.co/BVgY7XrT/babai.png";
 
 const DEFAULT_SETTINGS = {
   buttonSize: "small" as ButtonSize,
-  fontFamily: "JetBrains Mono" as FontFamily,
+  fontFamily: "Russo One" as FontFamily,
   fontSize: 12,
   fontBrightness: 100,
   theme: "normal" as Theme,
