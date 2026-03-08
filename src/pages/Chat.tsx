@@ -52,6 +52,7 @@ interface Message {
   sender_telegram_id?: number;
   read_at?: string | null;
   created_at?: string;
+  isAiGenerated?: boolean;
 }
 
 interface PendingRetry {
