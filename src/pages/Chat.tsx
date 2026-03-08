@@ -253,32 +253,53 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
-  // ── AI-Substitute: auto-respond to incoming real-user messages ──────────────
-  // When isAiSubstitute is ON and a new message arrives from the other real user,
-  // automatically generate and send an AI reply on the current user's behalf.
+  // ── AI-Substitute: 30s countdown then auto-respond ──────────────────────────
   useEffect(() => {
-    if (!isAiSubstitute) return;
+    if (!isAiSubstitute) {
+      if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+      setAiSubCountdown(0);
+      return;
+    }
     if (!friend || !character || !chatKey) return;
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
-    // Only react to incoming messages from the real friend (not AI, not self)
-    if (!lastMsg.sender_telegram_id) return; // AI message — skip
-    if (lastMsg.sender_telegram_id === profile?.telegram_id) return; // own message — skip
-    if (lastMsg.id === lastAutoRespondedIdRef.current) return; // already responded
+    if (!lastMsg.sender_telegram_id) return;
+    if (lastMsg.sender_telegram_id === profile?.telegram_id) return;
+    if (lastMsg.id === lastAutoRespondedIdRef.current) return;
 
-    lastAutoRespondedIdRef.current = lastMsg.id;
+    // Clear any previous countdown
+    if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
 
-    const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-    doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages);
-  }, [messages.length, isAiSubstitute, friend, character, chatKey, profile?.telegram_id]);
+    const targetMsgId = lastMsg.id;
+    let remaining = 30;
+    setAiSubCountdown(remaining);
+
+    aiSubIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      setAiSubCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(aiSubIntervalRef.current!);
+        setAiSubCountdown(0);
+        if (lastAutoRespondedIdRef.current !== targetMsgId) {
+          lastAutoRespondedIdRef.current = targetMsgId;
+          const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+          doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
+        }
+      }
+    }, 1000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, isAiSubstitute, friend?.name, character?.name, chatKey, profile?.telegram_id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
-    return () => { if (aiIntervalRef.current) clearInterval(aiIntervalRef.current); };
+    return () => {
+      if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
+      if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+    };
   }, []);
 
   const startAiCountdown = useCallback(() => {
