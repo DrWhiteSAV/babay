@@ -616,9 +616,6 @@ export default function Friends() {
 
             {/* Regular friends */}
             {friends.filter(f => f.name !== "ДанИИл").map((friend) => {
-                  const meta = friendsMeta[friend.name] || {};
-            {/* Regular friends */}
-            {friends.filter(f => f.name !== "ДанИИл").map((friend) => {
                 const meta = friendsMeta[friend.name] || {};
               const avatarSrc = meta.avatar_url || `https://picsum.photos/seed/${friend.name}/100/100`;
               const tgLink = meta.username ? `https://t.me/${meta.username}` : null;
