@@ -431,7 +431,7 @@ export default function Game() {
         bgGenResolvedRef.current = true;
         setBgImage(bgResult.url);
         setBgGenRetry(false);
-        if (tgId && bgResult.url.includes("ibb.co")) {
+        if (tgId) {
           saveImageToGallery(bgResult.url, tgId, `[backgrounds] Фон: ${diff}`, bgResult.prompt).catch(console.error);
         }
       } else {
