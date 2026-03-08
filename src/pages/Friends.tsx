@@ -596,11 +596,12 @@ export default function Friends() {
       {/* Energy Gift Modal */}
       <AnimatePresence>
         {energyModal && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-6">
             <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 60, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="w-full max-w-sm rounded-2xl p-6 space-y-5"
               style={{
                 background: "linear-gradient(180deg, rgba(30,30,40,0.97), rgba(20,20,30,0.99))",
