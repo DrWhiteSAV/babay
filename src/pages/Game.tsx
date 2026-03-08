@@ -348,9 +348,9 @@ export default function Game() {
         difficulty: diff,
       };
 
-      // Start 60s countdown for background gen
-      let countdown = 60;
-      setBgGenCountdown(60);
+      // Start 120s countdown for background gen
+      let countdown = 120;
+      setBgGenCountdown(120);
       if (bgGenIntervalRef.current) clearInterval(bgGenIntervalRef.current);
       bgGenIntervalRef.current = setInterval(() => {
         countdown -= 1;
