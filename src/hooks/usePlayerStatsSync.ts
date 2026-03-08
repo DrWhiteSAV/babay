@@ -222,8 +222,15 @@ export function usePlayerStatsSync() {
   const store = usePlayerStore();
 
   // Helper: write gameplay stats to DB immediately (no delay)
-  const writeGameplayToDB = useRef<(telegramId: number, payload: ReturnType<typeof JSON.parse>) => Promise<void>>();
-  writeGameplayToDB.current = async (telegramId: number, payload: Record<string, unknown>) => {
+  interface GameplayPayload {
+    fear: number;
+    energy: number;
+    watermelons: number;
+    boss_level: number;
+    telekinesis_level: number;
+  }
+  const writeGameplayToDB = useRef<(telegramId: number, payload: GameplayPayload) => Promise<void>>();
+  writeGameplayToDB.current = async (telegramId: number, payload: GameplayPayload) => {
     console.log(`[DB WRITE] ⚡ player_stats IMMEDIATE UPDATE for telegram_id=${telegramId}`, {
       fear: payload.fear,
       energy: payload.energy,
