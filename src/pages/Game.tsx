@@ -746,10 +746,13 @@ export default function Game() {
   // ======== SCREENS ========
 
   if (isGameOver) {
-    // PVP room mode → redirect to results page
+    // PVP room mode → show loading while DB write + redirect happen in useEffect
     if (pvpRoomId) {
-      navigate(`/pvp/results/${pvpRoomId}`, { replace: true });
-      return null;
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 size={32} className="animate-spin text-red-500" />
+        </div>
+      );
     }
     if (pvpParticipants.length > 0 && pvpResults) {
       const isWinner = pvpResults[0].isLocal && !exitedEarly;
