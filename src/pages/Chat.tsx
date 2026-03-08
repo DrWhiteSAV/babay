@@ -49,6 +49,7 @@ interface Message {
   sender: string;
   text: string;
   imageUrl?: string;
+  pvpRoomId?: string;
   replyTo?: string;
   sender_telegram_id?: number;
   read_at?: string | null;
