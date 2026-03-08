@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, ChangeEvent, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
-import { MessageSquare, Send, ImagePlus, X, Users, Reply, Check, CheckCheck, RefreshCw, AlertTriangle, Edit2, Bot, Pencil } from "lucide-react";
+import { MessageSquare, Send, ImagePlus, X, Users, Reply, Check, CheckCheck, RefreshCw, AlertTriangle, Edit2, Bot } from "lucide-react";
 import { generateFriendChat, generateMyAiReply } from "../services/ai";
 import ProfilePopup from "../components/ProfilePopup";
 import Header from "../components/Header";
@@ -10,6 +10,36 @@ import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
 import { useFriendOnlineStatus } from "../hooks/useOnlinePresence";
 import { pushNotification } from "../components/NotificationPopup";
+
+const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
+const ONLINE_THRESHOLD_MS = 3 * 60 * 1000;
+
+async function isUserOnline(telegramId: number): Promise<boolean> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("updated_at")
+    .eq("telegram_id", telegramId)
+    .single();
+  if (!data?.updated_at) return false;
+  return Date.now() - new Date(data.updated_at).getTime() < ONLINE_THRESHOLD_MS;
+}
+
+async function sendTelegramNotification(telegramId: number, text: string) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-telegram-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ telegram_id: telegramId, caption: text }),
+    });
+  } catch (e) {
+    console.warn("[Chat] TG notify error:", e);
+  }
+}
 
 const AI_REPLY_TIMEOUT = 20;
 
