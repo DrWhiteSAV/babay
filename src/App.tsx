@@ -34,6 +34,7 @@ import Gallery from "./pages/Gallery";
 import Leaderboard from "./pages/Leaderboard";
 import Events from "./pages/Events";
 import Achievements from "./pages/Achievements";
+import Chats from "./pages/Chats";
 import Admin from "./pages/Admin";
 import AdminPic from "./pages/AdminPic";
 import AdminVideo from "./pages/AdminVideo";

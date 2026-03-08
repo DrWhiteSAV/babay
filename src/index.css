@@ -420,11 +420,18 @@ body {
   text-shadow: 0 0 8px rgba(200, 130, 26, 0.5);
 }
 .theme-steampunk .hub-play-btn {
-  background: linear-gradient(135deg, #8b5e1a, #c89030) !important;
-  border-color: #d4a030 !important;
-  box-shadow: 0 0 15px rgba(180, 130, 30, 0.5) !important;
-  color: #1a1005 !important;
-  background-image: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px) !important;
+  background: linear-gradient(135deg, #c87c14, #f0b030, #d49020) !important;
+  border: 2px solid #f5c842 !important;
+  box-shadow: 0 0 28px rgba(240, 180, 40, 0.7), 0 0 8px rgba(255, 210, 80, 0.5), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  color: #1a0f00 !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 0 rgba(255,230,120,0.5) !important;
+  background-image: repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px) !important;
+  animation: steampunk-play-pulse 2.5s ease-in-out infinite !important;
+}
+@keyframes steampunk-play-pulse {
+  0%, 100% { box-shadow: 0 0 28px rgba(240, 180, 40, 0.7), 0 0 8px rgba(255, 210, 80, 0.5), inset 0 1px 0 rgba(255,255,255,0.2); }
+  50% { box-shadow: 0 0 45px rgba(255, 200, 50, 0.9), 0 0 20px rgba(255, 210, 80, 0.7), 0 0 60px rgba(220, 170, 30, 0.3), inset 0 1px 0 rgba(255,255,255,0.2); }
 }
 .theme-steampunk button:not(.cutscene-skip-btn) {
   transition: all 0.2s ease;
