@@ -504,7 +504,7 @@ export default function Chat() {
                     src={getAvatarUrl("user")}
                     alt="me"
                     className="w-7 h-7 rounded-full object-cover border border-white/10 cursor-pointer shadow-md"
-                    onClick={() => setShowProfilePopup("user")}
+                    onClick={() => setShowProfilePopup({ name: "user" })}
                   />
                 </div>
               )}
