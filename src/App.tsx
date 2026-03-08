@@ -16,7 +16,7 @@ import { NotificationPopupProvider } from "./components/NotificationPopup";
 import { useOnlinePresence } from "./hooks/useOnlinePresence";
 import { useAchievements } from "./hooks/useAchievements";
 import { usePlayerStatsSync } from "./hooks/usePlayerStatsSync";
-import AssetPreloader from "./components/AssetPreloader";
+import { AssetPreloaderProvider } from "./components/AssetPreloader";
 import { useIncomingMessageNotifier } from "./hooks/useIncomingMessageNotifier";
 
 // Pages
@@ -51,7 +51,6 @@ import { useTelegram } from "./context/TelegramContext";
 function AppContent() {
   const { entryMode, isLoading } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
-  const [assetsPreloaded, setAssetsPreloaded] = useState(false);
   const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds, setPageBackground, setVideoCutscenes } = usePlayerStore();
   const { playClick } = useAudio(settings.musicVolume);
   const location = useLocation();
@@ -189,9 +188,6 @@ function AppContent() {
 
   return (
     <>
-      {!assetsPreloaded && (
-        <AssetPreloader onComplete={() => setAssetsPreloaded(true)} />
-      )}
       <div 
         className={`min-h-[100dvh] bg-neutral-950 text-neutral-100 ${fontClass} ${themeClass} selection:bg-red-900 selection:text-white ${buttonSizeClass}`}
         style={activeBgUrl ? {
@@ -202,7 +198,7 @@ function AppContent() {
         } : {}}
       >
         <NotificationPopupProvider />
-        {assetsPreloaded && !hasSeenInitialCutscene && (
+        {!hasSeenInitialCutscene && (
           <CutscenePlayer onComplete={() => setHasSeenInitialCutscene(true)} />
         )}
         <style>{`
@@ -253,7 +249,9 @@ export default function App() {
   return (
     <Router>
       <TelegramProvider>
-        <AppContent />
+        <AssetPreloaderProvider>
+          <AppContent />
+        </AssetPreloaderProvider>
       </TelegramProvider>
     </Router>
   );

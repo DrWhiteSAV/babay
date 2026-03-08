@@ -2,18 +2,21 @@ import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { ArrowLeft, Skull, Zap } from "lucide-react";
 import { ReactNode, MouseEvent, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { usePreloadState } from "./AssetPreloader";
 
 interface HeaderProps {
   title?: ReactNode;
   backUrl?: string;
   onInfoClick?: (type: 'fear' | 'watermelons' | 'energy', e: MouseEvent) => void;
-  rightContent?: ReactNode; // We will use this for the profile icons
+  rightContent?: ReactNode;
 }
 
 export default function Header({ title, backUrl, onInfoClick, rightContent }: HeaderProps) {
   const navigate = useNavigate();
   const { fear, watermelons, energy, lastEnergyUpdate, storeConfig } = usePlayerStore();
   const [timeLeft, setTimeLeft] = useState(0);
+  const preload = usePreloadState();
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -35,12 +38,64 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  function formatMb(bytes: number) {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   return (
-    <header 
-      className="relative p-4 bg-black/20 backdrop-blur-2xl border-b border-white/10 sticky top-0 z-20 shrink-0 shadow-lg"
-      style={{ fontSize: '16px' }} // Fixed font size for header
+    <header
+      className="relative p-4 bg-black/20 backdrop-blur-2xl border-b border-white/10 sticky top-0 z-20 shrink-0 shadow-lg overflow-hidden"
+      style={{ fontSize: '16px' }}
     >
-      {/* Back Button (absolute top-left, with 1 row padding equivalent) */}
+      {/* ── Background download progress bar ── */}
+      <AnimatePresence>
+        {preload.active && (
+          <motion.div
+            key="preload-bar"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-x-0 top-0 h-0.5 overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+          >
+            <motion.div
+              className="h-full"
+              style={{ background: "linear-gradient(90deg, #7f1d1d, #ef4444, #f97316)" }}
+              animate={{ width: `${preload.pct}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Download status chip — shown below the bar while loading */}
+      <AnimatePresence>
+        {preload.active && (
+          <motion.div
+            key="preload-chip"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="absolute top-1 right-3 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono"
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {/* Animated dot */}
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-neutral-300">{preload.currentLabel}</span>
+            <span className="text-neutral-500">
+              {formatMb(preload.loadedBytes)}/{formatMb(preload.totalBytes)}
+            </span>
+            <span className="text-red-400 font-bold">{preload.pct}%</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Back Button */}
       {backUrl && (
         <div className="absolute left-4 top-14">
           <div
@@ -57,7 +112,7 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
       <div className="flex flex-col items-center justify-center w-full">
         {/* Row 1: Stats */}
         <div className="flex items-center justify-center gap-4 mb-2">
-          <div 
+          <div
             className="flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
             onClick={(e) => onInfoClick?.('energy', e)}
           >
@@ -68,13 +123,13 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
               {formatTime(timeLeft)}
             </div>
           </div>
-          <div 
+          <div
             className="flex items-center gap-1 text-red-500 font-bold cursor-pointer hover:opacity-80 transition-opacity text-[16px]"
             onClick={(e) => onInfoClick?.('fear', e)}
           >
             <Skull size={16} /> {fear}
           </div>
-          <div 
+          <div
             className="flex items-center gap-1 text-green-500 font-bold cursor-pointer hover:opacity-80 transition-opacity text-[16px]"
             onClick={(e) => onInfoClick?.('watermelons', e)}
           >
@@ -82,7 +137,7 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
           </div>
         </div>
 
-        {/* Row 2: Right Content (Profile/Settings) */}
+        {/* Row 2: Right Content */}
         {rightContent && (
           <div className="flex justify-center w-full mb-2 gap-4">
             {rightContent}
