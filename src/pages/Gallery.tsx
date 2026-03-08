@@ -70,10 +70,10 @@ export default function Gallery() {
 
   const getCategory = (item: GalleryItem): Section => {
     const label = (item.label || "").toLowerCase();
-    if (label.includes("[avatars]") || label.includes("аватар")) return "avatars";
-    if (label.includes("[backgrounds]") || label.includes("фон")) return "backgrounds";
-    if (label.includes("[bosses]") || label.includes("босс")) return "bosses";
-    return "avatars"; // Default uncategorized items to avatars (most likely case)
+    if (label.includes("[avatars]") || label.includes("[avatar]") || label.includes("аватар")) return "avatars";
+    if (label.includes("[backgrounds]") || label.includes("[background]") || label.includes("фон")) return "backgrounds";
+    if (label.includes("[bosses]") || label.includes("[boss]") || label.includes("босс")) return "bosses";
+    return "avatars";
   };
 
   const filteredItems = activeSection === "all"
