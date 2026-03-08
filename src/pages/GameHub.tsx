@@ -11,6 +11,7 @@ import {
   Loader2,
   Skull,
   Zap,
+  Image as ImageIcon,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 
