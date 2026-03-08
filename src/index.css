@@ -566,10 +566,20 @@ body {
   background: linear-gradient(135deg, #5020a0, #8040c8) !important;
   border-color: #c080ff !important;
   box-shadow: 0 0 20px rgba(140, 60, 220, 0.5) !important;
+  font-family: "Cinzel Decorative", cursive !important;
+}
+.theme-fantasy button:not(.cutscene-skip-btn) {
+  font-family: "Cinzel Decorative", cursive !important;
 }
 .theme-fantasy button:not(.cutscene-skip-btn):hover {
   background-color: rgba(120, 60, 180, 0.18) !important;
   box-shadow: 0 0 12px rgba(140, 80, 200, 0.3) !important;
+}
+.theme-fantasy .text-white,
+.theme-fantasy .text-neutral-200,
+.theme-fantasy .text-neutral-300 {
+  color: #ede0f8 !important;
+  font-family: "Cinzel Decorative", cursive !important;
 }
 .theme-fantasy .fog-layer,
 .theme-fantasy .fog-layer-2 {
