@@ -7,6 +7,7 @@ import Header from "../components/Header";
 import ProfilePopup from "../components/ProfilePopup";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
+import { notifyFriendAdded } from "../services/friendNotify";
 
 interface FriendWithMeta {
   name: string; // character_name

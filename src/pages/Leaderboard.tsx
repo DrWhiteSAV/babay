@@ -7,6 +7,7 @@ import Header from "../components/Header";
 import ProfilePopup from "../components/ProfilePopup";
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
+import { notifyFriendAdded } from "../services/friendNotify";
 
 type SortKey = "fear" | "watermelons" | "boss_level" | "energy" | "telekinesis_level";
 
