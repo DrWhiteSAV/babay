@@ -173,11 +173,13 @@ export default function Game() {
   // PVP room: report finish to DB when game over
   useEffect(() => {
     if (!pvpRoomId || !tgId || !isGameOver) return;
-    const score = localFear;
+    // Use ref to get the latest localFear value — state closure may be stale
+    const score = localFearRef.current;
+    const exited = exitedEarlyRef.current;
     (async () => {
       // Update member status to finished
       await supabase.from("pvp_room_members").update({
-        status: exitedEarly ? "timeout" : "finished",
+        status: exited ? "timeout" : "finished",
         score,
         finished_at: new Date().toISOString(),
       }).eq("room_id", pvpRoomId).eq("telegram_id", tgId);
@@ -186,7 +188,7 @@ export default function Game() {
       const { data: roomData } = await supabase
         .from("pvp_rooms").select("timer_ends_at, difficulty").eq("id", pvpRoomId).single();
 
-      if (roomData && !roomData.timer_ends_at && !exitedEarly) {
+      if (roomData && !roomData.timer_ends_at && !exited) {
         const waitMinutes = roomData.difficulty === "Невозможная" ? 10 : 3;
         const timerEndsAt = new Date(Date.now() + waitMinutes * 60 * 1000).toISOString();
         await supabase.from("pvp_rooms").update({ timer_ends_at: timerEndsAt }).eq("id", pvpRoomId);
