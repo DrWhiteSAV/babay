@@ -229,7 +229,7 @@ export const usePlayerStore = create<PlayerState>()(
       spendWatermelons: (amount) => {
         const { watermelons } = get();
         if (watermelons >= amount) {
-          set({ watermelons: watermelons - cost });
+          set({ watermelons: watermelons - amount });
           return true;
         }
         return false;
