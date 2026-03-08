@@ -217,10 +217,10 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
         />
       )}
 
-      {/* Skip button — pushed down 3 rows (top-24) to avoid Telegram close/back buttons */}
+      {/* Skip button — pushed down 4 rows (top-32) to avoid Telegram close/back buttons */}
       <button
         onClick={onComplete}
-        className="absolute top-24 right-4 z-20 text-white/50 hover:text-white/90 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors text-xs"
+        className="absolute top-32 right-4 z-20 text-white/50 hover:text-white/90 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors text-xs"
         style={{
           background: "rgba(0,0,0,0.25)",
           backdropFilter: "blur(4px)",

@@ -110,7 +110,7 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
       )}
 
       <div className="flex flex-col items-center justify-center w-full">
-        {/* Row 1: Stats */}
+        {/* Row 1: Stats (top — may be overlapped by camera on mobile) */}
         <div className="flex items-center justify-center gap-4 mb-2">
           <div
             className="flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -137,18 +137,18 @@ export default function Header({ title, backUrl, onInfoClick, rightContent }: He
           </div>
         </div>
 
-        {/* Row 2: Right Content */}
-        {rightContent && (
-          <div className="flex justify-center w-full mb-2 gap-4">
-            {rightContent}
-          </div>
-        )}
-
-        {/* Row 3: Title */}
+        {/* Row 2: Title (below stats — safe from camera overlap) */}
         {title && (
-          <h1 className="text-[20px] font-bold uppercase tracking-widest text-center flex items-center justify-center gap-2">
+          <h1 className="text-[20px] font-bold uppercase tracking-widest text-center flex items-center justify-center gap-2 mb-2">
             {title}
           </h1>
+        )}
+
+        {/* Row 3: Right Content (bottom row) */}
+        {rightContent && (
+          <div className="flex justify-center w-full gap-4">
+            {rightContent}
+          </div>
         )}
       </div>
     </header>
