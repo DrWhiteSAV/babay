@@ -208,9 +208,12 @@ export default function Chat() {
 
   const saveMessageToDB = async (msg: Message, role: string, senderName: string) => {
     if (!chatKey) return;
+    // Encode imageUrl into content using [img]: prefix so it persists in DB
+    let content = msg.text || '';
+    if (msg.imageUrl) content = `[img]:${msg.imageUrl}\n${content}`;
     await supabase.from("chat_messages").insert({
       telegram_id: profile?.telegram_id || 0,
-      content: msg.text || '',
+      content,
       role,
       friend_name: senderName,
       chat_key: chatKey,
