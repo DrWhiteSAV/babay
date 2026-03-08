@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
-import { ShoppingCart, Skull, Zap, Loader2, X, Sparkles, User, Download, ExternalLink } from "lucide-react";
+import { ShoppingCart, Skull, Loader2, X, Sparkles, Download, ExternalLink, RefreshCw } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 import Header from "../components/Header";
 import { useTelegram } from "../context/TelegramContext";
@@ -11,8 +11,13 @@ import { supabase } from "../integrations/supabase/client";
 const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
 
-// Generates new avatar via ProTalk, uploads to ImgBB via save-to-gallery, saves to gallery table
-// Returns the final imgbb URL (not a ProTalk URL)
+const GENERATION_TIMEOUT_SEC = 120;
+
+/**
+ * Generates new avatar via ProTalk → saves to gallery (ImgBB + DB + Telegram DM).
+ * Returns the final imgbb URL. The save-to-gallery EF handles:
+ * - ImgBB upload, gallery DB insert (label=[avatars]), player_stats avatar_url update, Telegram photo send.
+ */
 async function generateAndSaveAvatar(
   character: any,
   allOwnedItems: string[],
@@ -22,7 +27,7 @@ async function generateAndSaveAvatar(
   const genderDesc = character.gender === "Бабайка" ? "женский" : "мужской";
   const wishesStr = (character.wishes || []).join(", ") || "обычная внешность";
   const loreSnippet = character.lore ? ` Лор: ${character.lore.substring(0, 150)}.` : "";
-  const prompt = `Нарисуй горизонтальный обновлённый портрет славянского духа по имени ${character.name} (пол: ${genderDesc}). Стиль: ${character.style}. Особые приметы: ${wishesStr}.${loreSnippet} Ранее купленные предметы: ${allOwnedItems.slice(0, -1).join(", ") || "нет"}. НОВЫЙ предмет: ${newItemName} — должен быть заметно виден. Горизонтальная ориентация. Высокое качество.`;
+  const prompt = `Нарисуй обновлённый портрет славянского духа по имени ${character.name} (пол: ${genderDesc}). Стиль: ${character.style}. Особые приметы: ${wishesStr}.${loreSnippet} Ранее купленные предметы: ${allOwnedItems.slice(0, -1).join(", ") || "нет"}. НОВЫЙ предмет: ${newItemName} — должен быть заметно виден. Высокое качество.`;
 
   // Step 1: Generate via ProTalk
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
@@ -35,33 +40,29 @@ async function generateAndSaveAvatar(
   const rawUrl = data.imageUrl;
   if (!rawUrl || !rawUrl.startsWith("http")) return null;
 
-  // Step 2: Upload to ImgBB via save-to-gallery edge function → returns imgbb URL
+  // Step 2: save-to-gallery EF — uploads to ImgBB, inserts gallery row as [avatars],
+  //          updates player_stats avatar_url, sends Telegram DM photo
   const galResp = await fetch(`${SUPABASE_URL}/functions/v1/save-to-gallery`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
     body: JSON.stringify({
       imageUrl: rawUrl,
       telegramId,
-      label: `[avatars] ${character.name} + ${newItemName}`,
+      label: `[avatars] ${character.name}`,
       characterName: character.name,
       lore: character.lore || null,
+      wishes: character.wishes || [],
+      style: character.style || null,
+      gender: character.gender || null,
       prompt,
     }),
   });
 
-  if (!galResp.ok) {
-    // Fallback: try to upload directly to imgbb
-    return rawUrl;
-  }
+  if (!galResp.ok) return rawUrl;
 
   const galData = await galResp.json();
-  // Prefer imgbb URL (gallery_item.image_url is imgbb), then storage_url, then raw
-  const imgbbUrl = galData.gallery_item?.image_url || galData.storage_url;
-  if (imgbbUrl && imgbbUrl.startsWith("http") && imgbbUrl.includes("ibb.co")) {
-    return imgbbUrl;
-  }
-  // Return whatever we got
-  return imgbbUrl || rawUrl;
+  const finalUrl = galData.gallery_item?.image_url || galData.storage_url;
+  return finalUrl && finalUrl.startsWith("http") ? finalUrl : rawUrl;
 }
 
 export default function Shop() {
@@ -83,7 +84,34 @@ export default function Shop() {
     isGenerating: boolean;
     itemName: string;
     progress: string;
+    pendingItem: any | null; // kept for retry
+    pendingInventory: string[];
   } | null>(null);
+
+  // 120s countdown timer
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCountdown = () => {
+    setCountdown(GENERATION_TIMEOUT_SEC);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopCountdown = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setCountdown(0);
+  };
+
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
   const playSuccessSound = () => {
     try {
@@ -92,6 +120,36 @@ export default function Shop() {
       audio.play().catch(() => {});
     } catch {}
   };
+
+  const runAvatarGeneration = useCallback(async (item: any, allOwnedItems: string[]) => {
+    if (!character || !profile?.telegram_id) return;
+
+    setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: true, progress: "Отправляю запрос к нейросети...", newAvatar: null } : null);
+    startCountdown();
+
+    try {
+      const imgbbUrl = await generateAndSaveAvatar(
+        character,
+        allOwnedItems,
+        item.name,
+        profile.telegram_id,
+      );
+
+      stopCountdown();
+
+      if (imgbbUrl) {
+        // Update store + DB (save-to-gallery already updated DB, but sync store)
+        updateCharacter({ avatarUrl: imgbbUrl });
+        setAvatarEvolvePopup(prev => prev ? { ...prev, newAvatar: imgbbUrl, isGenerating: false, progress: "Готово!" } : null);
+      } else {
+        setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "ИИ не вернул картинку" } : null);
+      }
+    } catch (e) {
+      stopCountdown();
+      console.error("[Shop] Avatar evolution error:", e);
+      setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Ошибка генерации" } : null);
+    }
+  }, [character, profile]);
 
   const handleBuy = async (item: any) => {
     if (inventory.includes(item.id)) {
@@ -116,39 +174,21 @@ export default function Shop() {
       setTimeout(() => setSuccessEffect(null), 2000);
       setSelectedItem(null);
 
-      const oldAvatar = character.avatarUrl;
-      setAvatarEvolvePopup({ oldAvatar, newAvatar: null, isGenerating: true, itemName: item.name, progress: "Генерирую образ..." });
-
       const allOwnedItems = [...inventory, item.id]
         .map(id => [...shopItems, ...bossItems].find(i => i.id === id)?.name)
         .filter(Boolean) as string[];
 
-      try {
-        setAvatarEvolvePopup(prev => prev ? { ...prev, progress: "Отправляю запрос к нейросети..." } : null);
+      setAvatarEvolvePopup({
+        oldAvatar: character.avatarUrl,
+        newAvatar: null,
+        isGenerating: true,
+        itemName: item.name,
+        progress: "Генерирую образ...",
+        pendingItem: item,
+        pendingInventory: allOwnedItems,
+      });
 
-        const imgbbUrl = await generateAndSaveAvatar(
-          character,
-          allOwnedItems,
-          item.name,
-          profile.telegram_id,
-        );
-
-        if (imgbbUrl) {
-          // Update character avatar in store
-          updateCharacter({ avatarUrl: imgbbUrl });
-          // Update avatar_url in player_stats DB
-          await supabase.from("player_stats")
-            .update({ avatar_url: imgbbUrl })
-            .eq("telegram_id", profile.telegram_id);
-
-          setAvatarEvolvePopup(prev => prev ? { ...prev, newAvatar: imgbbUrl, isGenerating: false, progress: "Готово!" } : null);
-        } else {
-          setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Не удалось сгенерировать" } : null);
-        }
-      } catch (e) {
-        console.error("[Shop] Avatar evolution error:", e);
-        setAvatarEvolvePopup(prev => prev ? { ...prev, isGenerating: false, progress: "Ошибка генерации" } : null);
-      }
+      await runAvatarGeneration(item, allOwnedItems);
     }
 
     setIsProcessing(false);
