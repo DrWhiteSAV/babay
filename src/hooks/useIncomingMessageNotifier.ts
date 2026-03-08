@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
 import { usePlayerStore } from "../store/playerStore";
@@ -29,13 +29,35 @@ export function useIncomingMessageNotifier() {
     return () => events.forEach(ev => document.removeEventListener(ev, update));
   }, []);
 
+  // Build canonical chat keys from both telegram_ids (sorted numerically)
+  // We fetch friend telegram_ids from player_stats to build correct keys
+  const [friendTidMap, setFriendTidMap] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const realFriends = friends.filter(f => f.name !== "ДанИИл");
+    if (realFriends.length === 0) return;
+    supabase
+      .from("player_stats")
+      .select("telegram_id, character_name")
+      .in("character_name", realFriends.map(f => f.name))
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, number> = {};
+        for (const row of data) {
+          if (row.character_name && row.telegram_id) map[row.character_name] = row.telegram_id;
+        }
+        setFriendTidMap(map);
+      });
+  }, [friends.length]);
+
   useEffect(() => {
     if (!profile?.telegram_id) return;
     const myTid = profile.telegram_id;
 
+    // Build DM keys: [myTid, friendTid].sort() — canonical, same for both users
     const personalKeys = friends
-      .filter(f => f.name !== "ДанИИл")
-      .map(f => [myTid, f.name].sort().join("_"));
+      .filter(f => f.name !== "ДанИИл" && friendTidMap[f.name])
+      .map(f => [String(myTid), String(friendTidMap[f.name])].sort().join("_"));
+
     const groupKeys = groupChats.map(g => `group_${g.id}`);
     const allKeys = [...personalKeys, ...groupKeys];
     if (allKeys.length === 0) return;
@@ -88,5 +110,5 @@ export function useIncomingMessageNotifier() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.telegram_id, friends.length, groupChats.length, location.pathname]);
+  }, [profile?.telegram_id, friends.length, groupChats.length, location.pathname, friendTidMap]);
 }
