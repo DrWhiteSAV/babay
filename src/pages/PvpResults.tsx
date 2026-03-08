@@ -12,6 +12,7 @@ interface RoomMember {
   avatar_url: string | null;
   status: string;
   score: number;
+  watermelons: number;
   finished_at: string | null;
 }
 
@@ -44,7 +45,7 @@ const fmtTime = (s: number) =>
 export default function PvpResults() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { addFear } = usePlayerStore();
+  const { addFear, addWatermelons } = usePlayerStore();
   const { profile } = useTelegram();
   const tgId = profile?.telegram_id;
 
@@ -95,10 +96,12 @@ export default function PvpResults() {
   const maxScore = finishedMembers.length > 0 ? Math.max(...finishedMembers.map(m => m.score)) : 0;
   const winners = resultsFinalized && maxScore > 0 ? finishedMembers.filter(m => m.score === maxScore) : [];
   const totalFear = finishedMembers.reduce((sum, m) => sum + (m.score || 0), 0);
+  const totalWatermelons = finishedMembers.reduce((sum, m) => sum + (m.watermelons || 0), 0);
   const isWinner = winners.some(w => w.telegram_id === tgId);
-  const myReward = isWinner ? Math.ceil(totalFear / winners.length) : 0;
+  const myFearReward = isWinner ? Math.ceil(totalFear / winners.length) : 0;
+  const myWatermelonReward = isWinner ? Math.ceil(totalWatermelons / winners.length) : 0;
 
-  // When timer hits 0 → distribute rewards
+  // When results finalized → distribute rewards (fear + watermelons)
   useEffect(() => {
     if (!resultsFinalized || !room || !tgId || rewardAppliedRef.current) return;
     if (members.length === 0) return;
@@ -112,13 +115,16 @@ export default function PvpResults() {
     if (mxScore === 0) return;
 
     const ws = finished.filter(m => m.score === mxScore);
-    const total = finished.reduce((sum, m) => sum + (m.score || 0), 0);
+    const totalF = finished.reduce((sum, m) => sum + (m.score || 0), 0);
+    const totalW = finished.reduce((sum, m) => sum + (m.watermelons || 0), 0);
     const iWin = ws.some(w => w.telegram_id === tgId);
 
     if (iWin) {
-      const reward = Math.ceil(total / ws.length);
-      console.log(`[DB WRITE] 📝 PVP reward: tgId=${tgId}, reward=${reward} fear`);
-      addFear(reward);
+      const fearReward = Math.ceil(totalF / ws.length);
+      const watermelonReward = Math.ceil(totalW / ws.length);
+      console.log(`[DB WRITE] 📝 PVP reward: tgId=${tgId}, fear=${fearReward}, watermelons=${watermelonReward}`);
+      addFear(fearReward);
+      if (watermelonReward > 0) addWatermelons(watermelonReward);
     }
 
     supabase.from("pvp_rooms").update({ status: "finished" }).eq("id", room.id);
@@ -165,7 +171,8 @@ export default function PvpResults() {
             <Trophy size={48} className="text-yellow-400 mx-auto mb-3 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)]" />
             <h1 className="text-3xl font-black text-yellow-300 uppercase tracking-tighter">ПОБЕДА!</h1>
             <p className="text-yellow-200/70 text-sm mt-1">
-              Вы получили <span className="text-yellow-300 font-black">{myReward}</span> 💀 Страха
+              Вы получили <span className="text-yellow-300 font-black">{myFearReward}</span> 💀 Страха
+              {myWatermelonReward > 0 && <> и <span className="text-green-300 font-black">{myWatermelonReward}</span> 🍉 Арбузов</>}
               {winners.length > 1 && ` (делите с ${winners.length - 1} союзником)`}
             </p>
             <p className="text-xs text-neutral-500 mt-2">Комната #{roomId} · {room?.difficulty}</p>
@@ -201,9 +208,16 @@ export default function PvpResults() {
         {/* Bank */}
         <div className="p-3 bg-neutral-900/60 border border-neutral-800 rounded-xl flex justify-between items-center">
           <span className="text-neutral-400 text-sm">Общий банк</span>
-          <span className="font-black text-red-400 flex items-center gap-1.5">
-            <Skull size={14} />{totalFear} Страха
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-black text-red-400 flex items-center gap-1">
+              <Skull size={14} />{totalFear}
+            </span>
+            {totalWatermelons > 0 && (
+              <span className="font-black text-green-400 flex items-center gap-1">
+                🍉{totalWatermelons}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* All ranked members */}
@@ -260,7 +274,10 @@ export default function PvpResults() {
                   {isStillPlaying && <span className="text-blue-400">⏳ Ещё играет</span>}
                   {didTimeout && <span className="text-neutral-500">⏱ Не успел</span>}
                   {m.status === "finished" && !timerRunning && isWin && (
-                    <span className="text-yellow-400 font-bold">+{Math.ceil(totalFear / winners.length)} 💀 к счёту</span>
+                    <span className="text-yellow-400 font-bold">
+                      +{Math.ceil(totalFear / winners.length)} 💀
+                      {totalWatermelons > 0 && ` +${Math.ceil(totalWatermelons / winners.length)} 🍉`}
+                    </span>
                   )}
                 </div>
               </div>
@@ -273,6 +290,9 @@ export default function PvpResults() {
                   <Skull size={12} />
                   {isStillPlaying ? "—" : m.score}
                 </div>
+                {m.watermelons > 0 && !isStillPlaying && (
+                  <div className="text-xs text-green-400 font-bold">🍉{m.watermelons}</div>
+                )}
                 {isWin && !timerRunning && (
                   <div className="text-xs text-yellow-400 font-bold">
                     +{Math.ceil(totalFear / winners.length)} 💀

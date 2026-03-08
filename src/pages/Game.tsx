@@ -112,6 +112,7 @@ export default function Game() {
   const [localFear, setLocalFear] = useState(0);
   const localFearRef = useRef(0); // always-fresh ref for async closures
   const [localWatermelons, setLocalWatermelons] = useState(0);
+  const localWatermelonsRef = useRef(0); // always-fresh ref for async closures
   const [exitedEarly, setExitedEarly] = useState(false);
   const exitedEarlyRef = useRef(false);
 
@@ -210,12 +211,14 @@ export default function Game() {
     setPvpSaved(true);
     pvpSavedRef.current = true;
     const finalScore = localFearRef.current;
+    const finalWatermelons = localWatermelonsRef.current;
     const exited = exitedEarlyRef.current;
-    console.log(`[DB WRITE] 📝 PVP finish: tgId=${tgId}, room=${pvpRoomId}, score=${finalScore}, exited=${exited}`);
+    console.log(`[DB WRITE] 📝 PVP finish: tgId=${tgId}, room=${pvpRoomId}, score=${finalScore}, watermelons=${finalWatermelons}, exited=${exited}`);
     (async () => {
       const { error } = await supabase.from("pvp_room_members").update({
         status: exited ? "timeout" : "finished",
         score: finalScore,
+        watermelons: exited ? 0 : finalWatermelons,
         finished_at: new Date().toISOString(),
       }).eq("room_id", pvpRoomId).eq("telegram_id", tgId);
       console.log(`[DB WRITE] 📝 pvp_room_members update result:`, error ? `ERROR: ${error.message}` : "OK");
@@ -422,6 +425,7 @@ export default function Game() {
     setLocalFear(0);
     localFearRef.current = 0;
     setLocalWatermelons(0);
+    localWatermelonsRef.current = 0;
     setExitedEarly(false);
     exitedEarlyRef.current = false;
     setPvpResults(null);
@@ -707,7 +711,11 @@ export default function Game() {
     const reward = Math.floor(storeConfig.bossRewardBase * Math.pow(storeConfig.bossRewardMultiplier, bossLevel - 1) * bossRewardMultiplier);
     if (newTaps >= maxHp) {
       setIsBossDefeated(true);
-      if (pvpRoomId || pvpParticipants.length > 0) setLocalWatermelons(w => w + reward);
+      if (pvpRoomId || pvpParticipants.length > 0) setLocalWatermelons(w => {
+        const next = w + reward;
+        localWatermelonsRef.current = next;
+        return next;
+      });
       else addWatermelons(reward);
       playSuccess(settings.musicVolume);
     }
