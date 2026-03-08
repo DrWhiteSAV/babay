@@ -310,6 +310,7 @@ export type Database = {
       friends: {
         Row: {
           added_at: string
+          ai_substitute: boolean
           friend_name: string
           friend_telegram_id: number | null
           id: string
@@ -318,6 +319,7 @@ export type Database = {
         }
         Insert: {
           added_at?: string
+          ai_substitute?: boolean
           friend_name: string
           friend_telegram_id?: number | null
           id?: string
@@ -326,6 +328,7 @@ export type Database = {
         }
         Update: {
           added_at?: string
+          ai_substitute?: boolean
           friend_name?: string
           friend_telegram_id?: number | null
           id?: string
