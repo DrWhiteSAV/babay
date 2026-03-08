@@ -301,5 +301,6 @@ export function usePlayerStatsSync() {
     store.character?.wishes,
     store.settings,
     store.inventory,
+    store.gameStatus,
   ]);
 }
