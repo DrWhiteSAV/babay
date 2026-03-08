@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ProfilePopup from "../components/ProfilePopup";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "../integrations/supabase/client";
 import { usePlayerStore } from "../store/playerStore";
 import {
   generateScenario,
@@ -29,6 +30,9 @@ interface Scenario {
 
 export default function Game() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pvpRoomId = searchParams.get("pvp") || null;
+  const pvpDiffParam = searchParams.get("diff") as Difficulty | null;
   const {
     character, fear, energy, useEnergy, addFear, settings, gallery, addToGallery,
     addWatermelons, inventory, watermelons, lastEnergyUpdate, bossLevel,
@@ -154,9 +158,53 @@ export default function Game() {
     return () => { if (bossTimerRef.current) clearTimeout(bossTimerRef.current); };
   }, [isBossBattle, bossTimer, isBossDefeated, bossImage]);
 
-  // PVP results
+  // PVP room: auto-start game when arrived via ?pvp= param
   useEffect(() => {
-    if (isGameOver && pvpParticipants.length > 0 && !pvpResults) {
+    if (pvpRoomId && pvpDiffParam && !difficulty && character) {
+      startGame(pvpDiffParam);
+      setDifficulty(pvpDiffParam);
+      setMaxStages(pvpDiffParam === "Сложная" ? 16 : 46);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvpRoomId, pvpDiffParam, character]);
+
+  // PVP room: report finish to DB when game over
+  useEffect(() => {
+    if (!pvpRoomId || !tgId || !isGameOver) return;
+    const score = localFear;
+    (async () => {
+      // Update member status to finished
+      await supabase.from("pvp_room_members").update({
+        status: exitedEarly ? "timeout" : "finished",
+        score,
+        finished_at: new Date().toISOString(),
+      }).eq("room_id", pvpRoomId).eq("telegram_id", tgId);
+
+      // Check if this is the first finisher → set timer_ends_at
+      const { data: roomData } = await supabase
+        .from("pvp_rooms").select("timer_ends_at, difficulty").eq("id", pvpRoomId).single();
+
+      if (roomData && !roomData.timer_ends_at && !exitedEarly) {
+        const waitMinutes = roomData.difficulty === "Невозможная" ? 10 : 3;
+        const timerEndsAt = new Date(Date.now() + waitMinutes * 60 * 1000).toISOString();
+        await supabase.from("pvp_rooms").update({ timer_ends_at: timerEndsAt }).eq("id", pvpRoomId);
+      }
+
+      // Check if all playing members finished → close room
+      const { data: members } = await supabase
+        .from("pvp_room_members")
+        .select("status").eq("room_id", pvpRoomId);
+      const playingOrJoined = (members || []).filter(m => m.status === "playing" || m.status === "joined");
+      if (playingOrJoined.length === 0) {
+        await supabase.from("pvp_rooms").update({ status: "finished" }).eq("id", pvpRoomId);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGameOver, pvpRoomId, tgId]);
+
+  // PVP results (old local sim — keep for non-room PVP legacy)
+  useEffect(() => {
+    if (isGameOver && pvpParticipants.length > 0 && !pvpResults && !pvpRoomId) {
       const results: { name: string; fear: number; watermelons: number; isLocal: boolean; exited?: boolean }[] = pvpParticipants.map(p => {
         const successRate = 0.5 + Math.random() * 0.4;
         const simulatedFear = Math.floor(maxStages * successRate);
@@ -171,7 +219,7 @@ export default function Game() {
         addWatermelons(results.reduce((sum, r) => sum + r.watermelons, 0));
       }
     }
-  }, [isGameOver, pvpParticipants, pvpResults, localFear, localWatermelons, maxStages, exitedEarly, addFear, addWatermelons]);
+  }, [isGameOver, pvpParticipants, pvpResults, pvpRoomId, localFear, localWatermelons, maxStages, exitedEarly, addFear, addWatermelons]);
 
   const getDefaultGameBg = () => {
     const gameBg = pageBackgrounds["/game"];
@@ -678,6 +726,11 @@ export default function Game() {
   // ======== SCREENS ========
 
   if (isGameOver) {
+    // PVP room mode → redirect to results page
+    if (pvpRoomId) {
+      navigate(`/pvp/results/${pvpRoomId}`, { replace: true });
+      return null;
+    }
     if (pvpParticipants.length > 0 && pvpResults) {
       const isWinner = pvpResults[0].isLocal && !exitedEarly;
       const totalFear = pvpResults.reduce((sum, r) => sum + r.fear, 0);

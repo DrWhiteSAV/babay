@@ -13,6 +13,7 @@ import {
   Zap,
   Image as ImageIcon,
   MessageSquare,
+  Swords,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 
@@ -130,18 +131,30 @@ export default function GameHub() {
           </div>
         </motion.button>
 
-        {/* 2. Play button */}
-        <motion.button
+        {/* 2. Play buttons row */}
+        <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          onClick={() => navigate("/game")}
-          data-theme-block="hub-play"
-          className="hub-play-btn w-full py-5 bg-red-700 hover:bg-red-600 text-white rounded-2xl font-black text-xl transition-all active:scale-[0.97] flex items-center justify-center gap-3 shadow-[0_0_24px_rgba(220,38,38,0.35)] lightning-btn"
+          className="grid grid-cols-2 gap-3"
         >
-          <Play fill="currentColor" size={22} />
-          ИГРАТЬ
-        </motion.button>
+          <button
+            onClick={() => navigate("/game")}
+            data-theme-block="hub-play"
+            className="hub-play-btn py-5 bg-red-700 hover:bg-red-600 text-white rounded-2xl font-black text-xl transition-all active:scale-[0.97] flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(220,38,38,0.35)] lightning-btn"
+          >
+            <Play fill="currentColor" size={20} />
+            ИГРАТЬ
+          </button>
+          <button
+            onClick={() => navigate("/pvp")}
+            data-theme-block="hub-pvp"
+            className="hub-play-btn py-5 bg-neutral-900 hover:bg-neutral-800 border border-red-900/50 hover:border-red-700 text-white rounded-2xl font-black text-base transition-all active:scale-[0.97] flex flex-col items-center justify-center gap-1 lightning-btn"
+          >
+            <Swords size={20} className="text-red-400" />
+            <span className="text-sm">PVP</span>
+          </button>
+        </motion.div>
 
         {/* 3. Leaderboard + Chats row */}
         <motion.div
