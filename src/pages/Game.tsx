@@ -215,9 +215,11 @@ export default function Game() {
         setBossImageReady(true);
         // Save to gallery [bosses] via saveImageToGallery (unified approach)
         const activeTgId = tgIdRef.current ?? tgId ?? (charData ? Number(charData.telegram_id) || undefined : undefined);
-        console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, saving to gallery...`);
+        const bossLvl = charData?.boss_level || String(bossLevel || currentStage);
+        const bossLabel = `[bosses] Босс ур.${bossLvl}`;
+        console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, label="${bossLabel}", saving to gallery...`);
         if (activeTgId) {
-          saveImageToGallery(bResult.url, activeTgId, `[bosses] Босс ур.${bossLevel}`, bResult.prompt)
+          saveImageToGallery(bResult.url, activeTgId, bossLabel, bResult.prompt)
             .then(saved => console.log("[Game] 📦 boss gallery save:", saved ? "ok" : "failed"))
             .catch(console.error);
         } else {
