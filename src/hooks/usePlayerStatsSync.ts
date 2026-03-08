@@ -264,7 +264,7 @@ export function usePlayerStatsSync() {
   ]);
 }
 
-function buildSnapshot(store: ReturnType<typeof usePlayerStore>, telegramId: number): string {
+function buildSnapshot(store: ReturnType<typeof usePlayerStore.getState>, telegramId: number): string {
   const avatarUrl = isHttpUrl(store.character?.avatarUrl)
     ? store.character!.avatarUrl
     : FALLBACK_AVATAR;
