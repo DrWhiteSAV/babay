@@ -51,13 +51,17 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
       videosLoadedRef.current = true;
       const raw = videos[Math.floor(Math.random() * videos.length)];
       setVideoUrl(raw);
-    } else if (!videosLoadedRef.current) {
-      const fallbackTimer = setTimeout(() => {
-        if (!videosLoadedRef.current) onComplete();
-      }, 3000);
-      return () => clearTimeout(fallbackTimer);
     }
-  }, [videoCutscenes, onComplete]);
+    // Don't skip if empty — wait for async load from Supabase (handled by separate timer below)
+  }, [videoCutscenes]);
+
+  // Fallback: if after 6s still no video loaded from DB, skip cutscene
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!videosLoadedRef.current) onComplete();
+    }, 6000);
+    return () => clearTimeout(fallbackTimer);
+  }, [onComplete]);
 
   // Show "tap to start" immediately — don't wait for canplay
   useEffect(() => {
