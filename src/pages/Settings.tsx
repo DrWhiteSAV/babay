@@ -39,29 +39,32 @@ export default function Settings() {
 
         const existingCs = (existing?.custom_settings as Record<string, unknown>) || {};
 
+        const newCs = {
+          ...existingCs,
+          buttonSize: settings.buttonSize,
+          fontFamily: settings.fontFamily,
+          fontSize: settings.fontSize,
+          fontBrightness: settings.fontBrightness,
+          theme: settings.theme,
+          musicVolume: settings.musicVolume,
+          ttsEnabled: settings.ttsEnabled,
+        };
+
+        console.log(`[DB WRITE] 📝 Settings SAVE for telegram_id=${telegramId}`, newCs);
+
         // UPDATE only custom_settings — NEVER touch avatar_url or character fields
         const { error } = await supabase
           .from("player_stats")
-          .update({
-            custom_settings: {
-              ...existingCs,
-              buttonSize: settings.buttonSize,
-              fontFamily: settings.fontFamily,
-              fontSize: settings.fontSize,
-              fontBrightness: settings.fontBrightness,
-              theme: settings.theme,
-              musicVolume: settings.musicVolume,
-              ttsEnabled: settings.ttsEnabled,
-            },
-          })
+          .update({ custom_settings: newCs })
           .eq("telegram_id", telegramId);
 
         if (error) throw error;
+        console.log("[DB WRITE] ✅ Settings saved to DB successfully");
       }
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2000);
     } catch (e) {
-      console.error("Save settings error:", e);
+      console.error("[DB WRITE] ❌ Save settings error:", e);
     }
     setSaving(false);
   };
