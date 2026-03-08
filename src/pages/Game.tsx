@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ProfilePopup from "../components/ProfilePopup";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import {
@@ -98,6 +99,7 @@ export default function Game() {
   const [chatMessages, setChatMessages] = useState<{ sender: "user" | "danil"; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isDanilTyping, setIsDanilTyping] = useState(false);
+  const [showDanilProfile, setShowDanilProfile] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // PVP State
@@ -1160,11 +1162,14 @@ export default function Game() {
                   style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
                 />
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-800 relative z-10">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-red-900 shrink-0">
+                  <button
+                    className="w-10 h-10 rounded-full overflow-hidden border border-red-900 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setShowDanilProfile(true)}
+                  >
                     <img src={DANIL_AVATAR} alt="ДанИИл" className="w-full h-full object-cover" />
-                  </div>
+                  </button>
                   <div>
-                    <h3 className="font-bold text-lg">ДанИИл</h3>
+                    <button className="font-bold text-lg hover:text-red-400 transition-colors" onClick={() => setShowDanilProfile(true)}>ДанИИл</button>
                     <p className="text-xs text-green-500">В сети</p>
                   </div>
                 </div>
@@ -1249,6 +1254,9 @@ export default function Game() {
             ) : null}
           </AnimatePresence>
         </div>
+      )}
+      {showDanilProfile && (
+        <ProfilePopup name="ДанИИл" onClose={() => setShowDanilProfile(false)} />
       )}
     </div>
   );
