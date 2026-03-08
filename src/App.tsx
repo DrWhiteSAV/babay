@@ -262,6 +262,9 @@ function AppContent() {
           <Route path="/events" element={<Events />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/chats" element={<Chats />} />
+          <Route path="/pvp" element={<PvpSetup />} />
+          <Route path="/pvp/room/:roomId" element={<PvpRoom />} />
+          <Route path="/pvp/results/:roomId" element={<PvpResults />} />
           <Route path="/admin" element={<AdminGuard><Admin /></AdminGuard>} />
           <Route path="/admin/pic" element={<AdminGuard><AdminPic /></AdminGuard>} />
           <Route path="/admin/video" element={<AdminGuard><AdminVideo /></AdminGuard>} />
