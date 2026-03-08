@@ -54,10 +54,12 @@ export function usePlayerStatsSync() {
 
     const load = async () => {
       try {
-        const [statsResult, galleryResult] = await Promise.all([
+        const [statsResult, galleryResult, friendsResult] = await Promise.all([
           supabase.from("player_stats").select("*").eq("telegram_id", telegramId).maybeSingle(),
           supabase.from("gallery").select("image_url, label, created_at")
             .eq("telegram_id", telegramId).order("created_at", { ascending: false }).limit(12),
+          supabase.from("friends").select("friend_name, is_ai_enabled")
+            .eq("telegram_id", telegramId),
         ]);
 
         if (cancelled) return;
