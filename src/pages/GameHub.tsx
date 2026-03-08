@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { usePlayerStore } from "../store/playerStore";
 import { motion } from "motion/react";
@@ -7,28 +7,16 @@ import {
   Play,
   ShoppingCart,
   Settings,
-  User,
-  Zap,
-  Skull,
   Users,
   Trophy,
   Loader2,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 
-
 export default function GameHub() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { character, dbLoaded, fear, energy, watermelons, globalBackgroundUrl, pageBackgrounds } = usePlayerStore();
+  const { character, dbLoaded, pageBackgrounds } = usePlayerStore();
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
-
-  // Wait for DB load — don't redirect prematurely
-  useEffect(() => {
-    if (dbLoaded && !character) {
-      navigate("/");
-    }
-  }, [dbLoaded, character]);
 
   if (!dbLoaded) {
     return (
@@ -39,7 +27,9 @@ export default function GameHub() {
     );
   }
 
+  // DB loaded but no character → go home (inline, no race condition)
   if (!character) {
+    navigate("/", { replace: true });
     return null;
   }
 
@@ -96,9 +86,7 @@ export default function GameHub() {
             <div className="absolute inset-0 ring-inset ring-1 ring-white/10 rounded-full pointer-events-none" />
           </div>
 
-          <h2
-            className="text-3xl font-black text-white uppercase tracking-wider"
-          >
+          <h2 className="text-3xl font-black text-white uppercase tracking-wider">
             {character.name}
           </h2>
           <p className="text-red-500 text-xs mt-2 uppercase tracking-widest">
