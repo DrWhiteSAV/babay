@@ -203,8 +203,7 @@ export default function Chat() {
     };
     load();
 
-    // Subscribe without filter — filter server-side filter requires REPLICA IDENTITY FULL
-    // Instead we filter by chat_key client-side for reliability
+    // Subscribe — deduplicate by real DB id AND by pending_ prefix swap
     const channel = supabase
       .channel(`chat_${chatKey}_${Date.now()}`)
       .on(
@@ -212,7 +211,6 @@ export default function Chat() {
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const m = payload.new as any;
-          // Client-side filter: only process messages for this chat
           if (m.chat_key !== chatKey) return;
           const decoded = decodeContent(m.content);
           const msg: Message = {
@@ -227,13 +225,24 @@ export default function Chat() {
             created_at: m.created_at,
           };
           setMessages(prev => {
+            // Already present with real ID
             if (prev.some(p => p.id === msg.id)) return prev;
+            // Replace any pending_ placeholder that matches this content + sender
+            const pendingIdx = prev.findIndex(p =>
+              p.id.startsWith('pending_') &&
+              p.text === msg.text &&
+              p.imageUrl === msg.imageUrl
+            );
+            if (pendingIdx !== -1) {
+              const next = [...prev];
+              next[pendingIdx] = { ...next[pendingIdx], id: msg.id, read_at: msg.read_at, created_at: msg.created_at };
+              return next;
+            }
             return [...prev, msg];
           });
         }
       )
       .subscribe((status) => {
-        // If subscription fails, fallback: re-fetch messages every 5s
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[Chat] Realtime channel error, falling back to polling');
         }
@@ -258,7 +267,7 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
-  // ── AI-Substitute: 30s countdown then auto-respond ──────────────────────────
+  // ── AI-Substitute: 30s countdown then reply AS ME when friend sends a message ──
   useEffect(() => {
     if (!isAiSubstitute) {
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
@@ -269,9 +278,12 @@ export default function Chat() {
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
-    if (!lastMsg.sender_telegram_id) return;
-    if (lastMsg.sender_telegram_id === profile?.telegram_id) return;
+    // Only trigger when the last message is from the OTHER person (friend), not from me
+    const lastMsgFromFriend = lastMsg.sender !== 'user' && lastMsg.sender_telegram_id !== profile?.telegram_id;
+    if (!lastMsgFromFriend) return;
     if (lastMsg.id === lastAutoRespondedIdRef.current) return;
+    // Don't trigger if this is a pending_ (optimistic) message
+    if (lastMsg.id.startsWith('pending_')) return;
 
     // Clear any previous countdown
     if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
@@ -289,6 +301,7 @@ export default function Chat() {
         if (lastAutoRespondedIdRef.current !== targetMsgId) {
           lastAutoRespondedIdRef.current = targetMsgId;
           const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+          // Reply AS ME to the friend's message
           doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
         }
       }
@@ -414,10 +427,14 @@ export default function Chat() {
         return;
       }
       const tempId = `pending_ai_${Date.now()}`;
-      const aiMsg: Message = { id: tempId, sender: responder, text: responseText, replyTo: replyToMsgId || undefined, isAiGenerated: isSubstituteCall };
+      // isSubstituteCall: AI replies AS ME (sender='user', role='user')
+      // normal: AI replies AS the friend (sender=responder, role='assistant')
+      const msgSender = isSubstituteCall ? 'user' : responder;
+      const aiMsg: Message = { id: tempId, sender: msgSender, text: responseText, replyTo: replyToMsgId || undefined, isAiGenerated: isSubstituteCall };
       setMessages(prev => [...prev, aiMsg]);
-      const dbId = await saveMessageToDB(aiMsg, 'assistant', responder);
-      // Replace temp ID with real DB UUID to prevent realtime duplication
+      const dbRole = isSubstituteCall ? 'user' : 'assistant';
+      const dbSenderName = isSubstituteCall ? (character?.name || 'user') : responder;
+      const dbId = await saveMessageToDB(aiMsg, dbRole, dbSenderName);
       if (dbId) {
         setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
       }
@@ -481,7 +498,8 @@ export default function Chat() {
     if (dbId) {
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
     }
-    const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline);
+    // shouldUseAI: friend is AI-enabled and NOT in substitute mode (substitute handles reply flow separately)
+    const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline) && !isAiSubstitute;
     if (shouldUseAI) {
       const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
       const realMsgId = dbId || tempId;
