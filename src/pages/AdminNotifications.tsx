@@ -227,17 +227,8 @@ export default function AdminNotifications() {
     setTimeout(() => { ta.focus(); ta.setSelectionRange(s + macro.length, s + macro.length); }, 0);
   };
 
-  const msgRef = useRef<HTMLTextAreaElement | null>(null);
-  const titleRef = useRef<HTMLInputElement | null>(null);
 
-  const insertMacroIntoMessage = (macro: string) => {
-    const ta = msgRef.current;
-    if (!ta) { setForm(f => ({ ...f, message: f.message + macro })); return; }
-    const s = ta.selectionStart, e = ta.selectionEnd;
-    const newVal = form.message.slice(0, s) + macro + form.message.slice(e);
-    setForm(f => ({ ...f, message: newVal }));
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(s + macro.length, s + macro.length); }, 0);
-  };
+
 
   const handleAiImprove = async () => {
     if (!form.message) return;
