@@ -218,7 +218,13 @@ export default function AdminNotifications() {
   };
 
   const insertMacro = (macro: string) => {
-    setForm(f => ({ ...f, message: f.message + macro }));
+    const ta = msgRef.current;
+    if (!ta) { setForm(f => ({ ...f, message: f.message + macro })); return; }
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const cur = ta.value;
+    const newVal = cur.slice(0, s) + macro + cur.slice(e);
+    setForm(f => ({ ...f, message: newVal }));
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(s + macro.length, s + macro.length); }, 0);
   };
 
   const msgRef = useRef<HTMLTextAreaElement | null>(null);
