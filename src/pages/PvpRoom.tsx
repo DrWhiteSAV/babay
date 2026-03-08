@@ -374,9 +374,13 @@ export default function PvpRoom() {
                 <div className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   m.status === "finished" ? "bg-green-900/50 text-green-400" :
                   m.status === "playing" ? "bg-blue-900/50 text-blue-400" :
+                  m.status === "timeout" ? "bg-red-900/50 text-red-400" :
                   "bg-neutral-800 text-neutral-400"
                 }`}>
-                  {m.status === "finished" ? "✓ Финиш" : m.status === "playing" ? "🎮 Играет" : "⏳ Ждёт"}
+                  {m.status === "finished" ? "✓ Финиш" :
+                   m.status === "playing" ? "🎮 Играет" :
+                   m.status === "timeout" ? "💀 Проиграл" :
+                   "⏳ Ждёт"}
                 </div>
               </div>
             ))}
