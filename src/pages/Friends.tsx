@@ -204,14 +204,41 @@ export default function Friends() {
     setTimeout(() => setCopiedInvite(false), 2000);
   };
 
-  const shareEnergy = (friendName: string) => {
+  const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
+
+  const handleSendEnergy = async () => {
+    if (!energyModal) return;
     const { energy, useEnergy } = usePlayerStore.getState();
-    if (energy >= 10) {
-      useEnergy(10);
-      alert(`Вы поделились 10 энергии с ${friendName}!`);
-    } else {
-      alert("Недостаточно энергии для отправки.");
+    const amount = Math.max(1, Math.min(energyAmount, energy));
+    if (energy < amount) return;
+    setEnergySending(true);
+    useEnergy(amount);
+
+    // Send Telegram notification to recipient
+    if (energyModal.telegramId && profile?.telegram_id) {
+      try {
+        const senderName = character?.name || "Бабай";
+        const caption =
+          `⚡ *Тебе подарили энергию!*\n\n` +
+          `*${senderName}* поделился с тобой *${amount} ⚡ энергии* в игре Бабай.`;
+        await fetch(`${SUPABASE_URL}/functions/v1/send-telegram-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ telegram_id: energyModal.telegramId, caption }),
+        });
+      } catch (e) {
+        console.error("Energy notify error:", e);
+      }
     }
+
+    setEnergySending(false);
+    setEnergyModal(null);
+    setEnergyAmount(10);
   };
 
   const handleCreateGroup = () => {
