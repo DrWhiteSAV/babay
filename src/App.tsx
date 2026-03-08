@@ -61,6 +61,7 @@ function AppContent() {
   usePlayerStatsSync();
   useOnlinePresence();
   useAchievements();
+  useIncomingMessageNotifier();
 
 
   // Load page backgrounds and video cutscenes from Supabase on startup
