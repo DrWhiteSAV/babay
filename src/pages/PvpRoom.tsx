@@ -99,7 +99,6 @@ export default function PvpRoom() {
     loadChat();
 
     // Realtime subscription for room + members + chat
-    // pvp_rooms: always re-fetch full row (REPLICA IDENTITY FULL now set, but loadRoom is safer)
     const channel = supabase
       .channel(`pvp-room-${roomId}`)
       .on("postgres_changes", {
@@ -139,12 +138,14 @@ export default function PvpRoom() {
       })
       .subscribe();
 
-    // Polling fallback every 3s — ensures status sync even if realtime is slow
+    // Polling fallback every 3s for room/members, every 5s for chat
     const pollInterval = setInterval(loadRoom, 3000);
+    const chatPollInterval = setInterval(loadChat, 5000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
+      clearInterval(chatPollInterval);
     };
   }, [roomId]);
 
