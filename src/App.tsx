@@ -43,6 +43,7 @@ import AdminAudio from "./pages/AdminAudio";
 import AdminText from "./pages/AdminText";
 import AdminStat from "./pages/AdminStat";
 import AdminNotifications from "./pages/AdminNotifications";
+import AdminImages from "./pages/AdminImages";
 import AdminEvents from "./pages/AdminEvents";
 import AdminAchievements from "./pages/AdminAchievements";
 import NotificationSettings from "./pages/NotificationSettings";
