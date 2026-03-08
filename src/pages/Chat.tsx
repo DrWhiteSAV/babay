@@ -703,7 +703,7 @@ export default function Chat() {
       )}
 
       {showProfilePopup && (
-        <ProfilePopup name={showProfilePopup} onClose={() => setShowProfilePopup(null)} />
+        <ProfilePopup name={showProfilePopup.name} telegramId={showProfilePopup.telegramId} onClose={() => setShowProfilePopup(null)} />
       )}
     </motion.div>
   );
