@@ -553,13 +553,65 @@ export default function Settings() {
         {/* Reset Data */}
         <section className="pt-4 space-y-4">
           <button
-            onClick={handleResetProgress}
+            onClick={() => { setSnapshotName(character?.name || ""); setResetDialogOpen(true); }}
             disabled={resetting}
             className="w-full py-4 bg-neutral-900/50 backdrop-blur-sm hover:bg-red-900/20 text-red-500 border border-red-900/30 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
           >
             {resetting ? <><Loader2 size={18} className="animate-spin" /> Сброс...</> : "СБРОСИТЬ ПРОГРЕСС"}
           </button>
         </section>
+
+        {/* Reset confirmation dialog */}
+        <AnimatePresence>
+          {resetDialogOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+              onClick={() => setResetDialogOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-neutral-900 border border-red-900/50 rounded-2xl p-6 w-full max-w-sm space-y-4"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-red-400 text-center">⚠️ Сброс прогресса</h3>
+                <p className="text-sm text-neutral-300 text-center leading-relaxed">
+                  Весь прогресс, персонаж и инвентарь будут удалены. <span className="text-green-400 font-semibold">Текущая версия будет сохранена в истории</span> — её можно будет восстановить в разделе «История версий».
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs text-neutral-400 uppercase tracking-wider font-bold">Название для сохранения</label>
+                  <input
+                    type="text"
+                    value={snapshotName}
+                    onChange={e => setSnapshotName(e.target.value)}
+                    placeholder={character?.name || "Имя персонажа"}
+                    maxLength={40}
+                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white placeholder-neutral-500 outline-none focus:border-red-500 transition-colors text-sm"
+                  />
+                  <p className="text-[10px] text-neutral-600">Оставьте пустым, чтобы использовать имя персонажа</p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setResetDialogOpen(false)}
+                    className="flex-1 py-3 rounded-xl border border-neutral-700 text-neutral-300 font-bold hover:bg-neutral-800 transition-colors text-sm"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleResetProgress}
+                    className="flex-1 py-3 rounded-xl bg-red-900/60 hover:bg-red-800/70 border border-red-700 text-red-300 font-bold transition-colors text-sm"
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Notifications settings link */}
         <section>
