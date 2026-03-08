@@ -210,22 +210,13 @@ export default function Game() {
         setBossImage(bResult.url);
         bossImageReadyRef.current = true;
         setBossImageReady(true);
-        // Save to gallery [bosses] — save-to-gallery handles ImgBB upload + DB insert with telegram_id
+        // Save to gallery [bosses] via saveImageToGallery (unified approach)
         const activeTgId = tgId ?? profile?.telegram_id;
         console.log(`[Game] 👹 boss ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
-          const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-          const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-          fetch(`${SB_URL}/functions/v1/save-to-gallery`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SB_KEY}` },
-            body: JSON.stringify({
-              imageUrl: bResult.url,
-              telegramId: activeTgId,
-              label: `[bosses] Босс ур.${bossLevel}`,
-              prompt: bResult.prompt,
-            }),
-          }).then(r => r.json()).then(d => console.log("[Game] 📦 boss gallery save:", d.success ? "ok" : d.error)).catch(console.error);
+          saveImageToGallery(bResult.url, activeTgId, `[bosses] Босс ур.${bossLevel}`, bResult.prompt)
+            .then(saved => console.log("[Game] 📦 boss gallery save:", saved ? "ok" : "failed"))
+            .catch(console.error);
         } else {
           console.warn("[Game] ⚠️ no tgId — boss not saved to gallery");
         }
@@ -385,22 +376,13 @@ export default function Game() {
           const bgUrl = (bgResult as any).url;
           setBgImage(bgUrl);
           setBgGenRetry(false);
-          // Save to gallery [backgrounds] via save-to-gallery (handles ImgBB + DB insert with telegram_id)
+          // Save to gallery [backgrounds] via saveImageToGallery (unified approach)
           const activeTgId = tgId ?? profile?.telegram_id;
           console.log(`[Game] 🖼 background ready, tgId=${activeTgId}, saving to gallery...`);
           if (activeTgId) {
-            const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-            const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-            fetch(`${SB_URL}/functions/v1/save-to-gallery`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SB_KEY}` },
-              body: JSON.stringify({
-                imageUrl: bgUrl,
-                telegramId: activeTgId,
-                label: `[backgrounds] Фон: ${diff}`,
-                prompt: (bgResult as any).prompt,
-              }),
-            }).then(r => r.json()).then(d => console.log("[Game] 📦 bg gallery save:", d.success ? "ok" : d.error)).catch(console.error);
+            saveImageToGallery(bgUrl, activeTgId, `[backgrounds] Фон: ${diff}`, (bgResult as any).prompt)
+              .then(saved => console.log("[Game] 📦 bg gallery save:", saved ? "ok" : "failed"))
+              .catch(console.error);
           } else {
             console.warn("[Game] ⚠️ no tgId — bg not saved to gallery");
           }
@@ -455,18 +437,9 @@ export default function Game() {
         const activeTgId = tgId ?? profile?.telegram_id;
         console.log(`[Game] 🔁 retry bg ready, tgId=${activeTgId}, saving to gallery...`);
         if (activeTgId) {
-          const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-          const SB_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-          fetch(`${SB_URL}/functions/v1/save-to-gallery`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SB_KEY}` },
-            body: JSON.stringify({
-              imageUrl: bgResult.url,
-              telegramId: activeTgId,
-              label: `[backgrounds] Фон: ${diff}`,
-              prompt: bgResult.prompt,
-            }),
-          }).then(r => r.json()).then(d => console.log("[Game] 📦 retry bg gallery save:", d.success ? "ok" : d.error)).catch(console.error);
+          saveImageToGallery(bgResult.url, activeTgId, `[backgrounds] Фон: ${diff}`, bgResult.prompt)
+            .then(saved => console.log("[Game] 📦 retry bg gallery save:", saved ? "ok" : "failed"))
+            .catch(console.error);
         } else {
           console.warn("[Game] ⚠️ no tgId on retry — bg not saved to gallery");
         }
