@@ -65,7 +65,7 @@ export function detectEntryMode(): EntryMode {
 
 const LOVABLE_SUPER_USER: TelegramProfile = {
   id: "lovable-dev",
-  telegram_id: 169262990,
+  telegram_id: 169262991,
   first_name: "Создатель",
   last_name: null,
   username: null,
