@@ -65,11 +65,13 @@ export function usePlayerStatsSync() {
 
     const load = async () => {
       try {
-        const [statsResult, galleryResult, friendsResult] = await Promise.all([
+        const [statsResult, galleryResult, friendsResult, inventoryResult] = await Promise.all([
           supabase.from("player_stats").select("*").eq("telegram_id", telegramId).maybeSingle(),
           supabase.from("gallery").select("image_url, label, created_at")
             .eq("telegram_id", telegramId).order("created_at", { ascending: false }).limit(50),
           supabase.from("friends").select("friend_name, is_ai_enabled")
+            .eq("telegram_id", telegramId),
+          supabase.from("player_inventory").select("item_id")
             .eq("telegram_id", telegramId),
         ]);
 
@@ -105,11 +107,14 @@ export function usePlayerStatsSync() {
           isAiEnabled: f.is_ai_enabled ?? false,
         }));
 
+        // Load inventory from player_inventory table (source of truth, not custom_settings)
+        const inventoryFromDB = (inventoryResult.data || []).map(i => i.item_id);
+
         if (!data) {
           usePlayerStore.setState({
             character: null,
             fear: 0, energy: 100, watermelons: 0, bossLevel: 1,
-            inventory: [],
+            inventory: inventoryFromDB,
             friends: friendsList,
             settings: { ...DEFAULT_SETTINGS },
             gameStatus: "new",
@@ -124,7 +129,7 @@ export function usePlayerStatsSync() {
           usePlayerStore.setState({
             character: null,
             fear: 0, energy: 100, watermelons: 0, bossLevel: 1,
-            inventory: [],
+            inventory: inventoryFromDB,
             friends: friendsList,
             settings: { ...DEFAULT_SETTINGS },
             gameStatus: "reset",
@@ -138,9 +143,6 @@ export function usePlayerStatsSync() {
           : {};
 
         const settings = normalizeSettings(cs);
-        const inventory = Array.isArray(cs.inventory)
-          ? (cs.inventory as unknown[]).filter((x): x is string => typeof x === "string")
-          : [];
 
         let character = null;
         if (data.character_name) {
@@ -179,6 +181,7 @@ export function usePlayerStatsSync() {
           fontFamily: settings.fontFamily,
           buttonSize: settings.buttonSize,
           gameStatus,
+          inventoryCount: inventoryFromDB.length,
         });
 
         usePlayerStore.setState({
@@ -188,7 +191,7 @@ export function usePlayerStatsSync() {
           watermelons: typeof data.watermelons === "number" ? data.watermelons : 0,
           bossLevel: typeof data.boss_level === "number" ? Math.max(1, data.boss_level) : 1,
           settings,
-          inventory,
+          inventory: inventoryFromDB,
           friends: friendsList,
           gameStatus,
           dbLoaded: true,

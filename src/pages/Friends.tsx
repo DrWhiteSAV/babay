@@ -511,7 +511,17 @@ export default function Friends() {
                         ><MessageSquare size={15} /></button>
                         {!isDanil && (
                           <button
-                            onClick={() => { if (confirm(`Удалить ${friend.name}?`)) deleteFriend(friend.name); }}
+                            onClick={async () => {
+                              if (!confirm(`Удалить ${friend.name}?`)) return;
+                              deleteFriend(friend.name);
+                              if (profile?.telegram_id) {
+                                await supabase.from("friends").delete()
+                                  .eq("telegram_id", profile.telegram_id)
+                                  .eq("friend_name", friend.name);
+                                // Refresh meta
+                                setFriendsMeta(prev => { const n = { ...prev }; delete n[friend.name]; return n; });
+                              }
+                            }}
                             className="p-2 bg-neutral-800 hover:bg-red-900/50 rounded-lg text-red-500 transition-colors"
                           ><Trash2 size={15} /></button>
                         )}

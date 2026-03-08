@@ -46,13 +46,15 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [showProfilePopup, setShowProfilePopup] = useState<string | null>(null);
+  const [showProfilePopup, setShowProfilePopup] = useState<{ name: string; telegramId?: number } | null>(null);
   const [replyToMsg, setReplyToMsg] = useState<Message | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>(group?.members || []);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
+  // avatar_url cache: characterName -> url
+  const [avatarCache, setAvatarCache] = useState<Record<string, string>>({});
 
   const [aiCountdown, setAiCountdown] = useState(0);
   const [aiTimedOut, setAiTimedOut] = useState(false);
@@ -73,9 +75,31 @@ export default function Chat() {
   const [friendTelegramId, setFriendTelegramId] = useState<number | null>(null);
   useEffect(() => {
     if (!friendName) return;
-    supabase.from("player_stats").select("telegram_id").ilike("character_name", friendName).single()
-      .then(({ data }) => { if (data) setFriendTelegramId(data.telegram_id); });
+    supabase.from("player_stats").select("telegram_id, avatar_url").ilike("character_name", friendName).maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setFriendTelegramId(data.telegram_id);
+          if (data.avatar_url) setAvatarCache(p => ({ ...p, [friendName]: data.avatar_url! }));
+        }
+      });
   }, [friendName]);
+
+  // Load avatars for group members
+  useEffect(() => {
+    if (!group || group.members.length === 0) return;
+    const names = group.members.filter(m => m !== "ДанИИл");
+    if (names.length === 0) return;
+    supabase.from("player_stats").select("character_name, avatar_url")
+      .in("character_name", names)
+      .then(({ data }) => {
+        if (!data) return;
+        const entries: Record<string, string> = {};
+        for (const row of data) {
+          if (row.character_name && row.avatar_url) entries[row.character_name] = row.avatar_url;
+        }
+        if (Object.keys(entries).length > 0) setAvatarCache(p => ({ ...p, ...entries }));
+      });
+  }, [group?.id]);
 
   const onlineMap = useFriendOnlineStatus(friendTelegramId ? [friendTelegramId] : []);
   const isFriendOnline = friendTelegramId ? onlineMap[friendTelegramId] : false;
@@ -86,6 +110,18 @@ export default function Chat() {
 
   useEffect(() => {
     if (!chatKey) return;
+
+    // Helper to decode content that may contain [img]: prefix
+    const decodeContent = (raw: string) => {
+      if (raw.startsWith('[img]:')) {
+        const rest = raw.slice(6);
+        const nlIdx = rest.indexOf('\n');
+        if (nlIdx >= 0) return { imageUrl: rest.slice(0, nlIdx), text: rest.slice(nlIdx + 1) };
+        return { imageUrl: rest, text: '' };
+      }
+      return { imageUrl: undefined, text: raw };
+    };
+
     const load = async () => {
       const { data } = await supabase
         .from("chat_messages")
@@ -94,14 +130,22 @@ export default function Chat() {
         .order("created_at", { ascending: true })
         .limit(100);
       if (data) {
-        setMessages(data.map(m => ({
-          id: m.id,
-          sender: m.role === 'user' ? 'user' : m.friend_name,
-          text: m.content,
-          sender_telegram_id: (m as any).sender_telegram_id,
-          read_at: (m as any).read_at,
-          created_at: m.created_at,
-        })));
+        setMessages(data.map(m => {
+          const decoded = decodeContent(m.content);
+          const senderId = (m as any).sender_telegram_id;
+          const sender = m.role === 'user'
+            ? (senderId === profile?.telegram_id ? 'user' : m.friend_name)
+            : m.friend_name;
+          return {
+            id: m.id,
+            sender,
+            text: decoded.text,
+            imageUrl: decoded.imageUrl,
+            sender_telegram_id: senderId,
+            read_at: (m as any).read_at,
+            created_at: m.created_at,
+          };
+        }));
       }
     };
     load();
@@ -110,10 +154,12 @@ export default function Chat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `chat_key=eq.${chatKey}` },
         (payload) => {
           const m = payload.new as any;
+          const decoded = decodeContent(m.content);
           const msg: Message = {
             id: m.id,
             sender: m.role === 'user' ? (m.sender_telegram_id === profile?.telegram_id ? 'user' : m.friend_name) : m.friend_name,
-            text: m.content,
+            text: decoded.text,
+            imageUrl: decoded.imageUrl,
             sender_telegram_id: m.sender_telegram_id,
             read_at: m.read_at,
             created_at: m.created_at,
@@ -123,10 +169,11 @@ export default function Chat() {
             return [...prev, msg];
           });
           if (m.sender_telegram_id !== profile?.telegram_id) {
+            const previewText = decoded.imageUrl ? '📷 Фото' : decoded.text.slice(0, 80);
             pushNotification({
               type: 'chat',
               title: `💬 Новое сообщение`,
-              message: `${m.friend_name}: ${m.content.slice(0, 80)}`,
+              message: `${m.friend_name}: ${previewText}`,
             });
           }
         }
@@ -184,9 +231,12 @@ export default function Chat() {
 
   const saveMessageToDB = async (msg: Message, role: string, senderName: string) => {
     if (!chatKey) return;
+    // Encode imageUrl into content using [img]: prefix so it persists in DB
+    let content = msg.text || '';
+    if (msg.imageUrl) content = `[img]:${msg.imageUrl}\n${content}`;
     await supabase.from("chat_messages").insert({
       telegram_id: profile?.telegram_id || 0,
-      content: msg.text || '',
+      content,
       role,
       friend_name: senderName,
       chat_key: chatKey,
@@ -331,6 +381,8 @@ export default function Chat() {
   const getAvatarUrl = (sender: string) => {
     if (sender === "user") return character?.avatarUrl || "https://i.ibb.co/BVgY7XrT/babai.png";
     if (sender === "ДанИИл") return "https://i.ibb.co/rKGSq544/image.png";
+    // Use cached avatar from DB if available
+    if (avatarCache[sender]) return avatarCache[sender];
     return `https://picsum.photos/seed/${sender}/100/100`;
   };
 
@@ -396,7 +448,7 @@ export default function Chat() {
                       src={getAvatarUrl(msg.sender)}
                       alt="av"
                       className="w-7 h-7 rounded-full object-cover border border-white/10 cursor-pointer shadow-md"
-                      onClick={() => setShowProfilePopup(msg.sender)}
+                       onClick={() => setShowProfilePopup({ name: msg.sender, telegramId: msg.sender_telegram_id ?? undefined })}
                     />
                   ) : null}
                 </div>
@@ -407,7 +459,7 @@ export default function Chat() {
                 {group && !isUser && showAvatar && (
                   <span
                     className="text-[10px] text-neutral-400 mb-1 ml-1 cursor-pointer hover:text-white transition-colors"
-                    onClick={() => setShowProfilePopup(msg.sender)}
+                    onClick={() => setShowProfilePopup({ name: msg.sender, telegramId: msg.sender_telegram_id ?? undefined })}
                   >{msg.sender}</span>
                 )}
 
@@ -480,7 +532,7 @@ export default function Chat() {
                     src={getAvatarUrl("user")}
                     alt="me"
                     className="w-7 h-7 rounded-full object-cover border border-white/10 cursor-pointer shadow-md"
-                    onClick={() => setShowProfilePopup("user")}
+                    onClick={() => setShowProfilePopup({ name: "user" })}
                   />
                 </div>
               )}
@@ -679,7 +731,7 @@ export default function Chat() {
       )}
 
       {showProfilePopup && (
-        <ProfilePopup name={showProfilePopup} onClose={() => setShowProfilePopup(null)} />
+        <ProfilePopup name={showProfilePopup.name} telegramId={showProfilePopup.telegramId} onClose={() => setShowProfilePopup(null)} />
       )}
     </motion.div>
   );
