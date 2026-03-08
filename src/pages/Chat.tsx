@@ -99,12 +99,6 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const chatKey = groupId
-    ? `group_${groupId}`
-    : profile?.telegram_id && friend
-    ? [profile.telegram_id, friendName].sort().join('_')
-    : null;
-
   const [friendTelegramId, setFriendTelegramId] = useState<number | null>(null);
   useEffect(() => {
     if (!friendName) return;
@@ -116,6 +110,18 @@ export default function Chat() {
         }
       });
   }, [friendName]);
+
+  // Canonical chat key:
+  // - DM: sorted [myTid, friendTid] joined by "_"  → same for both sides
+  // - Group: "group_<groupId>"
+  // - AI-only friend (no telegram_id): fallback to "ai_<myTid>_<friendName>"
+  const chatKey = groupId
+    ? `group_${groupId}`
+    : profile?.telegram_id && friend
+      ? friendTelegramId
+        ? [profile.telegram_id, friendTelegramId].map(String).sort().join('_')
+        : `ai_${profile.telegram_id}_${friendName}` // AI-only, no real user
+      : null;
 
   // Load avatars for group members
   useEffect(() => {
