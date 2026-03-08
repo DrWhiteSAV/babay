@@ -119,7 +119,6 @@ export default function Gallery() {
 
     const telegramId = profile?.telegram_id;
 
-    // First, try to find full metadata in the avatars table
     let parsedName: string | null = null;
     let parsedLore: string | null = null;
     let parsedWishes: string[] = [];
@@ -140,9 +139,7 @@ export default function Gallery() {
         parsedWishes = Array.isArray(avatarRow.wishes) ? avatarRow.wishes : [];
         parsedStyle = avatarRow.style || null;
         parsedGender = avatarRow.gender || null;
-        console.log("[Gallery] Found avatar metadata in avatars table:", { parsedName, parsedLore: parsedLore?.substring(0, 60), parsedWishes });
       } else {
-        // Fallback: parse from label "[avatars] Name | Lore"
         const rawLabel = (selectedImage.label || "")
           .replace(/^\[(avatars?|backgrounds?|bosses?)\]\s*/i, "")
           .replace(/^Аватар:\s*/i, "")
@@ -150,25 +147,15 @@ export default function Gallery() {
         const parts = rawLabel.split(/\s*\|\s*/);
         parsedName = parts[0]?.trim() || null;
         parsedLore = parts.slice(1).join(" | ").trim() || null;
-        console.log("[Gallery] Parsed from label (no avatars row found):", { parsedName, parsedLore: parsedLore?.substring(0, 60) });
       }
     }
 
-    const updates: Record<string, unknown> = {
-      avatar_url: selectedImage.image_url,
-    };
+    const updates: Record<string, unknown> = { avatar_url: selectedImage.image_url };
     if (parsedName) updates.character_name = parsedName;
     if (parsedLore) updates.lore = parsedLore;
     if (parsedStyle) updates.character_style = parsedStyle;
     if (parsedGender) updates.character_gender = parsedGender;
 
-    console.log(`[DB WRITE] 📝 Gallery SET AVATAR for telegram_id=${telegramId}`, {
-      avatar_url: selectedImage.image_url.substring(0, 60),
-      character_name: parsedName,
-      lore: parsedLore?.substring(0, 80),
-    });
-
-    // Update store immediately (all identity fields)
     updateCharacter({
       avatarUrl: selectedImage.image_url,
       ...(parsedName ? { name: parsedName } : {}),
@@ -179,19 +166,29 @@ export default function Gallery() {
     });
 
     if (telegramId) {
-      // Update player_stats identity fields ONLY (avatar_url, character_name, lore, style, gender)
-      // NEVER touch custom_settings here
       const { error } = await supabase.from("player_stats")
         .update(updates)
         .eq("telegram_id", telegramId);
-
-      if (error) {
-        console.error("[DB WRITE] ❌ Gallery set avatar error:", error.message);
-      } else {
-        console.log("[DB WRITE] ✅ Gallery avatar + identity saved to player_stats (identity fields only, custom_settings untouched)");
-      }
+      if (error) console.error("[DB WRITE] ❌ Gallery set avatar error:", error.message);
     }
     setSelectedImage(null);
+    setSelectedLore(null);
+  };
+
+  // Load lore from avatars table when opening an avatar image
+  const handleOpenImage = async (item: GalleryItem) => {
+    setSelectedImage(item);
+    setSelectedLore(null);
+    playClick();
+    if (getCategory(item) === "avatars" && profile?.telegram_id) {
+      const { data } = await supabase
+        .from("avatars")
+        .select("lore")
+        .eq("telegram_id", profile.telegram_id)
+        .eq("image_url", item.image_url)
+        .maybeSingle();
+      if (data?.lore) setSelectedLore(data.lore);
+    }
   };
 
   return (
