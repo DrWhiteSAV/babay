@@ -42,6 +42,7 @@ async function sendTelegramNotification(telegramId: number, text: string) {
 }
 
 const AI_REPLY_TIMEOUT = 20;
+const AI_SUB_TIMEOUT = 30;
 
 interface Message {
   id: string;
@@ -103,8 +104,12 @@ export default function Chat() {
   const aiResolvedRef = useRef(false);
   const lastAutoRespondedIdRef = useRef<string | null>(null);
 
-  const [aiSubCountdown, setAiSubCountdown] = useState(0);
+  // AI-substitute countdown shown as typing bubble in message feed
+  const [aiSubCountdown, setAiSubCountdown] = useState(0); // used in banner only to cancel
+  const [aiSubTypingCountdown, setAiSubTypingCountdown] = useState(0); // shown in message bubble
   const aiSubIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // broadcast channel ref for AI-substitute typing indicator
+  const aiSubBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -296,11 +301,33 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
+  // ── AI-Substitute: listen for typing broadcasts from the OTHER side ──
+  useEffect(() => {
+    if (!chatKey || !profile?.telegram_id) return;
+    // We subscribe to broadcasts on this chat's typing channel to show the countdown bubble
+    // when the AI-substitute on the other side is preparing a reply
+    const typingCh = supabase
+      .channel(`ai_sub_typing_${chatKey}`)
+      .on('broadcast', { event: 'ai_sub_typing' }, ({ payload }: { payload: { remaining: number; senderTid: number } }) => {
+        // Only show typing for messages FROM the other user (not ourselves)
+        if (payload.senderTid === profile.telegram_id) return;
+        setAiSubTypingCountdown(payload.remaining);
+      })
+      .subscribe();
+    if (aiSubBroadcastChannelRef.current) supabase.removeChannel(aiSubBroadcastChannelRef.current);
+    aiSubBroadcastChannelRef.current = typingCh;
+    return () => {
+      supabase.removeChannel(typingCh);
+      aiSubBroadcastChannelRef.current = null;
+    };
+  }, [chatKey, profile?.telegram_id]);
+
   // ── AI-Substitute: 30s countdown then reply AS ME when friend sends a message ──
   useEffect(() => {
     if (!isAiSubstitute) {
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
       setAiSubCountdown(0);
+      setAiSubTypingCountdown(0);
       return;
     }
     if (!friend || !character || !chatKey) return;
@@ -318,15 +345,28 @@ export default function Chat() {
     if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
 
     const targetMsgId = lastMsg.id;
-    let remaining = 30;
+    let remaining = AI_SUB_TIMEOUT;
+    // Show typing bubble locally for ourselves too
+    setAiSubTypingCountdown(remaining);
     setAiSubCountdown(remaining);
+
+    // Broadcast to recipient that AI-sub is typing with countdown
+    const broadcastTyping = (rem: number) => {
+      const bc = aiSubBroadcastChannelRef.current;
+      if (bc) bc.send({ type: 'broadcast', event: 'ai_sub_typing', payload: { remaining: rem, senderTid: profile?.telegram_id } });
+    };
+    broadcastTyping(remaining);
 
     aiSubIntervalRef.current = setInterval(() => {
       remaining -= 1;
       setAiSubCountdown(remaining);
+      setAiSubTypingCountdown(remaining);
+      broadcastTyping(remaining);
       if (remaining <= 0) {
         clearInterval(aiSubIntervalRef.current!);
         setAiSubCountdown(0);
+        setAiSubTypingCountdown(0);
+        broadcastTyping(0);
         if (lastAutoRespondedIdRef.current !== targetMsgId) {
           lastAutoRespondedIdRef.current = targetMsgId;
           const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
@@ -346,6 +386,7 @@ export default function Chat() {
     return () => {
       if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+      if (aiSubBroadcastChannelRef.current) supabase.removeChannel(aiSubBroadcastChannelRef.current);
     };
   }, []);
 
@@ -829,6 +870,35 @@ export default function Chat() {
           )}
         </AnimatePresence>
 
+        {/* AI-Substitute typing bubble — shown to BOTH sides (owner via state, recipient via broadcast) */}
+        <AnimatePresence>
+          {aiSubTypingCountdown > 0 && (
+            <motion.div
+              key="ai-sub-typing"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              className="flex justify-start items-end gap-2"
+            >
+              {/* Show sender's avatar: owner sees own avatar (ИИ пишет за тебя), recipient sees friend's avatar */}
+              <img
+                src={isAiSubstitute ? getAvatarUrl("user") : getAvatarUrl(friend?.name || chatTitle || "user")}
+                alt="ai-sub"
+                className="w-7 h-7 rounded-full object-cover border border-green-500/30"
+              />
+              <div className="chat-bubble-typing px-4 py-3 flex items-center gap-2">
+                <Bot size={12} className="text-green-400 shrink-0" />
+                <div className="flex gap-1">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </div>
+                <span className="text-[10px] font-mono text-green-400 ml-1 font-bold">{aiSubTypingCountdown}с</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div ref={chatEndRef} />
       </div>
 
@@ -877,14 +947,9 @@ export default function Chat() {
                 <Bot size={15} className="text-green-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-green-300 block">ИИ-заместитель активен · отвечает за тебя</span>
-                  {aiSubCountdown > 0 && (
-                    <span className="text-[10px] text-green-500 font-mono">
-                      Ответит через <span className="text-green-300 font-bold">{aiSubCountdown}с</span>
-                    </span>
-                  )}
                 </div>
                 <button
-                  onClick={() => { toggleAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); }}
+                  onClick={() => { toggleAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); setAiSubTypingCountdown(0); if (aiSubBroadcastChannelRef.current) aiSubBroadcastChannelRef.current.send({ type: 'broadcast', event: 'ai_sub_typing', payload: { remaining: 0, senderTid: profile?.telegram_id } }); }}
                   className="text-green-400 hover:text-white text-xs font-bold shrink-0"
                 >Выкл</button>
               </motion.div>
