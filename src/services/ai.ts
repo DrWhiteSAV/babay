@@ -24,6 +24,7 @@ async function callProTalkDirect(
   type: "text" | "image",
   prompt: string,
   telegramId?: number,
+  chatKey?: string,
 ): Promise<{ text: string; imageUrl?: string | null }> {
   console.log(`[AI] ProTalk type=${type}, tgId=${telegramId}, prompt="${prompt.substring(0, 80)}..."`);
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/protalk-ai`, {
@@ -32,7 +33,7 @@ async function callProTalkDirect(
       "Content-Type": "application/json",
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({ type, prompt, telegramId }),
+    body: JSON.stringify({ type, prompt, telegramId, chatKey }),
   });
   if (!resp.ok) {
     const err = await resp.text();
@@ -48,9 +49,10 @@ async function callAI(
   service: string,
   prompt: string,
   telegramId?: number,
+  chatKey?: string,
 ): Promise<{ text: string; imageUrl?: string | null }> {
   const type = service === "protalk-image" ? "image" : "text";
-  return callProTalkDirect(type, prompt, telegramId);
+  return callProTalkDirect(type, prompt, telegramId, chatKey);
 }
 
 export async function generateSpookyVoice(_text: string): Promise<string> {
