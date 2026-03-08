@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore, ButtonSize, FontFamily, Theme, DEFAULT_SETTINGS } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
@@ -45,6 +45,7 @@ export default function Settings() {
   const [resetting, setResetting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
+  const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset dialog state
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -158,48 +159,56 @@ export default function Settings() {
     setRestoringId(null);
   };
 
-  const handleSaveSettings = async () => {
-    setSaving(true);
+  const saveSettingsToDB = useCallback(async (currentSettings: typeof settings) => {
+    const telegramId = profile?.telegram_id;
+    if (!telegramId) return;
     try {
-      const telegramId = profile?.telegram_id;
-      if (telegramId) {
-        // READ current custom_settings from DB first to preserve wishes/inventory
-        const { data: existing } = await supabase
-          .from("player_stats")
-          .select("custom_settings")
-          .eq("telegram_id", telegramId)
-          .single();
-
-        const existingCs = (existing?.custom_settings as Record<string, unknown>) || {};
-
-        const newCs = {
-          ...existingCs,
-          buttonSize: settings.buttonSize,
-          fontFamily: settings.fontFamily,
-          fontSize: settings.fontSize,
-          fontBrightness: settings.fontBrightness,
-          theme: settings.theme,
-          musicVolume: settings.musicVolume,
-          ttsEnabled: settings.ttsEnabled,
-        };
-
-        console.log(`[DB WRITE] 📝 Settings SAVE for telegram_id=${telegramId}`, newCs);
-
-        // UPDATE only custom_settings — NEVER touch avatar_url or character fields
-        const { error } = await supabase
-          .from("player_stats")
-          .update({ custom_settings: newCs })
-          .eq("telegram_id", telegramId);
-
-        if (error) throw error;
-        console.log("[DB WRITE] ✅ Settings saved to DB successfully");
-      }
+      const { data: existing } = await supabase
+        .from("player_stats")
+        .select("custom_settings")
+        .eq("telegram_id", telegramId)
+        .single();
+      const existingCs = (existing?.custom_settings as Record<string, unknown>) || {};
+      const newCs = {
+        ...existingCs,
+        buttonSize: currentSettings.buttonSize,
+        fontFamily: currentSettings.fontFamily,
+        fontSize: currentSettings.fontSize,
+        fontBrightness: currentSettings.fontBrightness,
+        theme: currentSettings.theme,
+        musicVolume: currentSettings.musicVolume,
+        ttsEnabled: currentSettings.ttsEnabled,
+      };
+      const { error } = await supabase
+        .from("player_stats")
+        .update({ custom_settings: newCs })
+        .eq("telegram_id", telegramId);
+      if (error) throw error;
+      console.log("[DB WRITE] ✅ Settings auto-saved");
       setSavedOk(true);
-      setTimeout(() => setSavedOk(false), 2000);
+      setTimeout(() => setSavedOk(false), 1500);
     } catch (e) {
       console.error("[DB WRITE] ❌ Save settings error:", e);
     }
     setSaving(false);
+  }, [profile?.telegram_id]);
+
+  // Auto-save settings on any change (debounced 800ms)
+  useEffect(() => {
+    if (!profile?.telegram_id) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setSaving(true);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveSettingsToDB(settings);
+    }, 800);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [settings.buttonSize, settings.fontFamily, settings.fontSize, settings.fontBrightness, settings.theme, settings.musicVolume, settings.ttsEnabled]);
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    await saveSettingsToDB(settings);
   };
 
   const handleResetProgress = async () => {
@@ -471,11 +480,13 @@ export default function Settings() {
             className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
               savedOk
                 ? "bg-green-800 border border-green-600 text-green-300"
+                : saving
+                ? "bg-neutral-800 border border-neutral-700 text-neutral-400"
                 : "bg-red-900/30 hover:bg-red-900/50 border border-red-700 text-red-300"
             }`}
           >
             {saving ? <><Loader2 size={18} className="animate-spin" /> Сохранение...</> :
-             savedOk ? <>✓ Сохранено!</> :
+             savedOk ? <>✓ Сохранено автоматически</> :
              <><Save size={18} /> СОХРАНИТЬ НАСТРОЙКИ</>}
           </button>
         </section>
