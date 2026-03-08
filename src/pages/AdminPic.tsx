@@ -16,6 +16,7 @@ const PAGES = [
   { path: "/profile", name: "Профиль (Profile)" },
   { path: "/settings", name: "Настройки (Settings)" },
   { path: "/friends", name: "Друзья (Friends)" },
+  { path: "/chats", name: "Чаты (Chats)" },
   { path: "/chat", name: "Чат (Chat)" },
   { path: "/gallery", name: "Галерея (Gallery)" },
   { path: "/leaderboard", name: "Рейтинг (Leaderboard)" },
