@@ -144,7 +144,7 @@ export default function Game() {
   };
 
   const startGame = async (diff: Difficulty) => {
-    const cost = diff === "Сложная" ? 1 : diff === "Невозможная" ? 5 : 25;
+    const cost = diff === "Сложная" ? 3 : diff === "Невозможная" ? 15 : 50;
     if (!useEnergy(cost)) {
       alert("Недостаточно энергии!");
       return;
@@ -161,13 +161,12 @@ export default function Game() {
     setExitedEarly(false);
     setPvpResults(null);
     setIsGameOver(false);
-    // No cutscene - go straight to world generation
 
     // Set default background immediately from admin panel
     const defaultBg = getDefaultGameBg();
     setBgImage(defaultBg);
 
-    // Now generate world background ONCE before first stage
+    // Phase 1: Generate world background FIRST, then load stage text
     if (character) {
       setIsGeneratingWorld(true);
       setBgGenStatus("generating");
@@ -189,15 +188,16 @@ export default function Game() {
       };
 
       try {
-        // Generate BG image separately (no concurrent text gen)
-        const bgResult = await generateBackgroundImage(1, character.style, charData, tgId);
-        if (bgResult.url && bgResult.url.startsWith("http")) {
-          setBgImage(bgResult.url);
-          addToGallery(bgResult.url);
-          // Save to gallery DB via ImgBB
-        if (tgId) {
-          saveImageToGallery(bgResult.url, tgId, `[backgrounds] Фон игры: ${diff}`, bgResult.prompt).catch(console.error);
-        }
+        // 30s timeout for background generation
+        const bgPromise = generateBackgroundImage(1, character.style, charData, tgId);
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
+        const bgResult = await Promise.race([bgPromise, timeoutPromise]);
+        
+        if (bgResult && (bgResult as any).url && (bgResult as any).url.startsWith("http")) {
+          setBgImage((bgResult as any).url);
+          if (tgId) {
+            saveImageToGallery((bgResult as any).url, tgId, `[backgrounds] Фон игры: ${diff}`, (bgResult as any).prompt).catch(console.error);
+          }
         }
       } catch (e) {
         console.warn("[Game] world bg gen failed, using default:", e);
@@ -207,8 +207,10 @@ export default function Game() {
       setIsGeneratingWorld(false);
     }
 
+    // Phase 2: Load first stage text AFTER background is ready
     await loadNextStage(1);
   };
+
 
   const getBossTimeBonus = () => {
     if (inventory.includes("pajama_star")) return 15;
