@@ -34,6 +34,7 @@ import Gallery from "./pages/Gallery";
 import Leaderboard from "./pages/Leaderboard";
 import Events from "./pages/Events";
 import Achievements from "./pages/Achievements";
+import Chats from "./pages/Chats";
 import Admin from "./pages/Admin";
 import AdminPic from "./pages/AdminPic";
 import AdminVideo from "./pages/AdminVideo";
@@ -247,6 +248,7 @@ function AppContent() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/chats" element={<Chats />} />
           <Route path="/admin" element={<AdminGuard><Admin /></AdminGuard>} />
           <Route path="/admin/pic" element={<AdminGuard><AdminPic /></AdminGuard>} />
           <Route path="/admin/video" element={<AdminGuard><AdminVideo /></AdminGuard>} />
