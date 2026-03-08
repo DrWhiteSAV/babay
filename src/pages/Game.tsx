@@ -425,6 +425,7 @@ export default function Game() {
     setLocalFear(0);
     localFearRef.current = 0;
     setLocalWatermelons(0);
+    localWatermelonsRef.current = 0;
     setExitedEarly(false);
     exitedEarlyRef.current = false;
     setPvpResults(null);
