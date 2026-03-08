@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
@@ -8,6 +8,7 @@ import ProfilePopup from "../components/ProfilePopup";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 import { notifyFriendAdded } from "../services/friendNotify";
+import { useFriendOnlineStatus } from "../hooks/useOnlinePresence";
 
 const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
