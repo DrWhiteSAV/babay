@@ -317,6 +317,36 @@ export async function generateFriendChat(
   }
 }
 
+/**
+ * AI substitute for the USER: generates what the user would say to their friend.
+ * Used when AI-substitute mode is ON — the AI writes on behalf of the current player.
+ */
+export async function generateMyAiReply(
+  friendName: string,
+  character: any,
+  chatHistory: { sender: string; text: string }[] = [],
+  telegramId?: number,
+): Promise<string> {
+  try {
+    let historyText = "";
+    if (chatHistory.length > 0) {
+      historyText =
+        "\nИстория переписки:\n" +
+        chatHistory
+          .map((m) => `${m.sender === "user" ? character?.name || "Я" : m.sender}: ${m.text}`)
+          .join("\n") +
+        "\n";
+    }
+    const loreLine = character?.lore ? `\nЛор Бабая: ${character.lore}` : "";
+    const prompt = `Ты — ИИ-заместитель игрока по имени ${character?.name || "Бабай"} (пол: ${character?.gender || "Бабай"}, стиль мира: ${character?.style || "Хоррор"}).${loreLine} Твой друг — ${friendName}. Последние сообщения в чате:${historyText} Напиши короткий (1-3 предложения) ответ от лица игрока ${character?.name || "Бабай"} другу ${friendName}. Говори в стиле Бабая, в образе персонажа, без кавычек, без пояснений.`;
+    const { text } = await callAI("protalk-text", prompt, telegramId);
+    return text.trim() || "Привет!";
+  } catch (e) {
+    console.error("[AI] My reply gen error:", e);
+    return "Привет!";
+  }
+}
+
 export async function generateLore(
   name: string,
   gender: string,

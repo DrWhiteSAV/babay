@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
@@ -8,6 +8,7 @@ import ProfilePopup from "../components/ProfilePopup";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 import { notifyFriendAdded } from "../services/friendNotify";
+import { useFriendOnlineStatus } from "../hooks/useOnlinePresence";
 
 const SUPABASE_URL = "https://psuvnvqvspqibsezcrny.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdXZudnF2c3BxaWJzZXpjcm55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMDI5NTIsImV4cCI6MjA4NzU3ODk1Mn0.VHI6Kefzbz6Hc8TpLI5_JRXAyPJ-y4oeE3Bkh16jFRU";
@@ -33,6 +34,13 @@ export default function Friends() {
   const [energyModal, setEnergyModal] = useState<{ friendName: string; telegramId?: number } | null>(null);
   const [energyAmount, setEnergyAmount] = useState(10);
   const [energySending, setEnergySending] = useState(false);
+
+  // Collect all friend telegram IDs for online status polling
+  const friendTelegramIds = useMemo(
+    () => Object.values(friendsMeta).map(m => m.telegram_id).filter(Boolean) as number[],
+    [friendsMeta]
+  );
+  const onlineMap = useFriendOnlineStatus(friendTelegramIds);
 
   useEffect(() => {
     if (!profile?.telegram_id) return;
@@ -454,22 +462,26 @@ export default function Friends() {
           ) : (
             <div className="space-y-3">
               {friends.map((friend) => {
-                const meta = friendsMeta[friend.name] || {};
+                  const meta = friendsMeta[friend.name] || {};
                 const isDanil = friend.name === "ДанИИл";
                 const avatarSrc = isDanil ? "https://i.ibb.co/rKGSq544/image.png" : (meta.avatar_url || `https://picsum.photos/seed/${friend.name}/100/100`);
                 const tgLink = meta.username ? `https://t.me/${meta.username}` : null;
+                const isOnline = meta.telegram_id ? !!onlineMap[meta.telegram_id] : false;
 
                 return (
                   <div key={friend.name} className="bg-neutral-900/80 backdrop-blur-md p-3 rounded-xl border border-neutral-800 flex flex-col gap-2">
                     {/* Top row: avatar + names + buttons */}
                     <div className="flex items-center gap-2 w-full min-w-0">
-                      {/* Avatar */}
-                      <img
-                        src={avatarSrc}
-                        alt="avatar"
-                        className="w-10 h-10 rounded-full object-cover border border-neutral-700 shrink-0 cursor-pointer"
-                        onClick={() => setShowProfilePopup({ name: friend.name, telegramId: meta.telegram_id })}
-                      />
+                      {/* Avatar with online dot */}
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatarSrc}
+                          alt="avatar"
+                          className="w-10 h-10 rounded-full object-cover border border-neutral-700 cursor-pointer"
+                          onClick={() => setShowProfilePopup({ name: friend.name, telegramId: meta.telegram_id })}
+                        />
+                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-neutral-900 ${isDanil ? 'bg-green-400 shadow-[0_0_5px_#4ade80]' : isOnline ? 'bg-green-400 shadow-[0_0_5px_#4ade80]' : 'bg-neutral-600'}`} />
+                      </div>
 
                       {/* Name block */}
                       <div
@@ -527,19 +539,6 @@ export default function Friends() {
                         )}
                       </div>
                     </div>
-
-                    {/* AI toggle */}
-                    {!isDanil && (
-                      <div className="flex items-center justify-between text-sm border-t border-neutral-800 pt-2">
-                        <span className="text-neutral-400 text-xs">ИИ-заместитель:</span>
-                        <button
-                          onClick={() => toggleFriendAi(friend.name)}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${friend.isAiEnabled ? 'bg-green-900/50 text-green-400 border border-green-800' : 'bg-neutral-800 text-neutral-500 border border-neutral-700'}`}
-                        >
-                          {friend.isAiEnabled ? "ВКЛ" : "ВЫКЛ"}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
