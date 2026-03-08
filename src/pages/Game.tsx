@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ProfilePopup from "../components/ProfilePopup";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "../integrations/supabase/client";
 import { usePlayerStore } from "../store/playerStore";
 import {
   generateScenario,
