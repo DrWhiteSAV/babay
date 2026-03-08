@@ -93,7 +93,7 @@ function withCountdown(
 
 export default function CharacterCreate() {
   const navigate = useNavigate();
-  const { setCharacter, addFear, addEnergy } = usePlayerStore();
+  const { setCharacter, addFear, addEnergy, updateSettings } = usePlayerStore();
   const { profile } = useTelegram();
 
   const [gender, setGender] = useState<Gender | null>(null);
@@ -398,12 +398,30 @@ export default function CharacterCreate() {
     clearInterval(interval);
   }, [tgId]);
 
-  const handleStyleSelect = async (s: Style) => {
+  // Maps style names to theme keys for live preview
+  const styleToTheme: Record<Style, string> = {
+    "Фотореализм": "normal",
+    "Хоррор": "horror",
+    "Стимпанк": "steampunk",
+    "Киберпанк": "cyberpunk",
+    "Аниме": "anime",
+    "Постсоветский": "soviet",
+    "Русская сказка": "fairytale",
+    "2D мультфильм": "cartoon",
+    "Фентези деревня": "fantasy",
+  };
+
+  const handleStyleSelect = (s: Style) => {
     setStyle(s);
-    if (!gender || loreLocked) return;
     pendingStyleRef.current = s;
+    // Switch the app theme live — exactly like Settings does
+    updateSettings({ theme: styleToTheme[s] as any });
+  };
+
+  const handleCreateLore = async () => {
+    if (!style || !gender || loreLocked || isGeneratingLore) return;
     const name = generatedName || (gender === "Бабай" ? "Бурьяник" : "Тьмарица");
-    await doGenerateLore(s, gender, name);
+    await doGenerateLore(style, gender, name);
   };
 
   const handleRetryLore = async () => {
@@ -731,7 +749,7 @@ export default function CharacterCreate() {
             </div>
 
             <h3 className="text-xl font-bold text-white">Выбери стиль</h3>
-            <p className="text-xs text-neutral-400">После выбора стиля появится история твоего духа</p>
+            <p className="text-xs text-neutral-400">Стиль сразу меняет оформление — выбери и нажми «Создать легенду!»</p>
             <div className="grid grid-cols-2 gap-3">
               {STYLES.map((s) => (
                 <button
@@ -741,12 +759,33 @@ export default function CharacterCreate() {
                   className={`p-3 rounded-xl border text-sm font-medium transition-all relative ${style === s ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:bg-neutral-800"} disabled:opacity-60`}
                 >
                   {s}
-                  {style === s && isGeneratingLore && (
-                    <span className="absolute top-1 right-1"><Loader2 size={12} className="animate-spin text-red-400" /></span>
-                  )}
+                  {style === s && <span className="absolute top-1 right-1 text-[10px] text-red-400">✓</span>}
                 </button>
               ))}
             </div>
+
+            {/* "Создать легенду!" button — appears after style selected, before lore generated */}
+            <AnimatePresence>
+              {style && !loreLocked && !isGeneratingLore && !loreTimeout && (
+                <motion.button
+                  key="create-lore-btn"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  onClick={handleCreateLore}
+                  disabled={isGeneratingName || nameTimeout}
+                  className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(220,38,38,0.85), rgba(190,18,60,0.75))",
+                    border: "1px solid rgba(255,120,120,0.3)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 20px rgba(220,38,38,0.3)",
+                  }}
+                >
+                  <Sparkles size={18} className="text-yellow-300" />
+                  Создать легенду!
+                </motion.button>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {(generatedLore || isGeneratingLore || loreTimeout) && (
@@ -788,16 +827,20 @@ export default function CharacterCreate() {
               )}
             </AnimatePresence>
 
-            <button
-              disabled={!style || isGeneratingName || isGeneratingLore || nameTimeout}
-              onClick={() => setStep(3)}
-              className="w-full py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGeneratingLore
-                ? <><Loader2 size={16} className="animate-spin" /> Создаём историю...</>
-                : <>Далее <ArrowRight size={18} /></>
-              }
-            </button>
+            {/* "Далее" — only enabled after lore is generated */}
+            <AnimatePresence>
+              {loreLocked && !loreTimeout && (
+                <motion.button
+                  key="next-btn"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => setStep(3)}
+                  className="w-full py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2"
+                >
+                  Далее <ArrowRight size={18} />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
