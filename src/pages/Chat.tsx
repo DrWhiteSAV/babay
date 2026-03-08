@@ -301,11 +301,33 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
+  // ── AI-Substitute: listen for typing broadcasts from the OTHER side ──
+  useEffect(() => {
+    if (!chatKey || !profile?.telegram_id) return;
+    // We subscribe to broadcasts on this chat's typing channel to show the countdown bubble
+    // when the AI-substitute on the other side is preparing a reply
+    const typingCh = supabase
+      .channel(`ai_sub_typing_${chatKey}`)
+      .on('broadcast', { event: 'ai_sub_typing' }, ({ payload }: { payload: { remaining: number; senderTid: number } }) => {
+        // Only show typing for messages FROM the other user (not ourselves)
+        if (payload.senderTid === profile.telegram_id) return;
+        setAiSubTypingCountdown(payload.remaining);
+      })
+      .subscribe();
+    if (aiSubBroadcastChannelRef.current) supabase.removeChannel(aiSubBroadcastChannelRef.current);
+    aiSubBroadcastChannelRef.current = typingCh;
+    return () => {
+      supabase.removeChannel(typingCh);
+      aiSubBroadcastChannelRef.current = null;
+    };
+  }, [chatKey, profile?.telegram_id]);
+
   // ── AI-Substitute: 30s countdown then reply AS ME when friend sends a message ──
   useEffect(() => {
     if (!isAiSubstitute) {
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
       setAiSubCountdown(0);
+      setAiSubTypingCountdown(0);
       return;
     }
     if (!friend || !character || !chatKey) return;
@@ -323,15 +345,28 @@ export default function Chat() {
     if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
 
     const targetMsgId = lastMsg.id;
-    let remaining = 30;
+    let remaining = AI_SUB_TIMEOUT;
+    // Show typing bubble locally for ourselves too
+    setAiSubTypingCountdown(remaining);
     setAiSubCountdown(remaining);
+
+    // Broadcast to recipient that AI-sub is typing with countdown
+    const broadcastTyping = (rem: number) => {
+      const bc = aiSubBroadcastChannelRef.current;
+      if (bc) bc.send({ type: 'broadcast', event: 'ai_sub_typing', payload: { remaining: rem, senderTid: profile?.telegram_id } });
+    };
+    broadcastTyping(remaining);
 
     aiSubIntervalRef.current = setInterval(() => {
       remaining -= 1;
       setAiSubCountdown(remaining);
+      setAiSubTypingCountdown(remaining);
+      broadcastTyping(remaining);
       if (remaining <= 0) {
         clearInterval(aiSubIntervalRef.current!);
         setAiSubCountdown(0);
+        setAiSubTypingCountdown(0);
+        broadcastTyping(0);
         if (lastAutoRespondedIdRef.current !== targetMsgId) {
           lastAutoRespondedIdRef.current = targetMsgId;
           const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
@@ -351,6 +386,7 @@ export default function Chat() {
     return () => {
       if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+      if (aiSubBroadcastChannelRef.current) supabase.removeChannel(aiSubBroadcastChannelRef.current);
     };
   }, []);
 
