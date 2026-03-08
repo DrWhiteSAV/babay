@@ -66,6 +66,7 @@ function AppContent() {
   useOnlinePresence();
   useAchievements();
   useIncomingMessageNotifier();
+  useGroupChatsSync();
 
 
   // Load page backgrounds and video cutscenes from Supabase on startup
