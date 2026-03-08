@@ -94,6 +94,7 @@ export default function Chat() {
   const [pendingRetry, setPendingRetry] = useState<PendingRetry | null>(null);
   const aiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const aiResolvedRef = useRef(false);
+  const lastAutoRespondedIdRef = useRef<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -240,6 +241,26 @@ export default function Chat() {
         });
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
+
+  // ── AI-Substitute: auto-respond to incoming real-user messages ──────────────
+  // When isAiSubstitute is ON and a new message arrives from the other real user,
+  // automatically generate and send an AI reply on the current user's behalf.
+  useEffect(() => {
+    if (!isAiSubstitute) return;
+    if (!friend || !character || !chatKey) return;
+    if (messages.length === 0) return;
+
+    const lastMsg = messages[messages.length - 1];
+    // Only react to incoming messages from the real friend (not AI, not self)
+    if (!lastMsg.sender_telegram_id) return; // AI message — skip
+    if (lastMsg.sender_telegram_id === profile?.telegram_id) return; // own message — skip
+    if (lastMsg.id === lastAutoRespondedIdRef.current) return; // already responded
+
+    lastAutoRespondedIdRef.current = lastMsg.id;
+
+    const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+    doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages);
+  }, [messages.length, isAiSubstitute, friend, character, chatKey, profile?.telegram_id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
