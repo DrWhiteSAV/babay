@@ -401,7 +401,7 @@ export default function Game() {
     if (!character) return;
     setBgGenRetry(false);
     bgGenResolvedRef.current = false;
-    setBgGenCountdown(60);
+    setBgGenCountdown(120);
     setIsGeneratingWorld(true);
 
     const diff = difficulty || "Сложная";
