@@ -1,0 +1,1 @@
+ALTER TABLE public.friends ADD COLUMN IF NOT EXISTS ai_substitute boolean NOT NULL DEFAULT false;
