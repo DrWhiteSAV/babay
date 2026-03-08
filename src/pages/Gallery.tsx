@@ -7,6 +7,9 @@ import Header from "../components/Header";
 import { supabase } from "../integrations/supabase/client";
 import { useTelegram } from "../context/TelegramContext";
 
+// Video cache key — preserved on progress reset
+const VIDEO_CACHE_KEY = "babai_video_cache";
+
 interface GalleryItem {
   id: string;
   image_url: string;
@@ -19,7 +22,7 @@ type Section = "all" | "avatars" | "backgrounds" | "bosses";
 export default function Gallery() {
   const { settings, updateCharacter, character } = usePlayerStore();
   const { playClick } = useAudio(settings.musicVolume);
-  const { profile } = useTelegram();
+  const { profile, isLoading: tgLoading } = useTelegram();
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,15 +33,18 @@ export default function Gallery() {
     typeof url === "string" && /^https?:\/\//i.test(url.trim());
 
   const loadGallery = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-
+    // Wait for Telegram profile to be available
     const tgId = profile?.telegram_id;
     if (!tgId) {
-      setItems([]);
-      setLoading(false);
+      if (!tgLoading) {
+        setItems([]);
+        setLoading(false);
+      }
       return;
     }
+
+    setLoading(true);
+    setLoadError(null);
 
     console.log("[Gallery] Loading for telegram_id:", tgId);
 
@@ -47,14 +53,13 @@ export default function Gallery() {
       .select("id, image_url, label, created_at")
       .eq("telegram_id", tgId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     console.log("[Gallery] DB result:", { count: data?.length, error: error?.message });
 
     if (error) {
       console.error("[Gallery] load error:", error);
-      setLoadError("Не удалось загрузить галерею из базы данных");
-      setItems([]);
+      setLoadError("Не удалось загрузить галерею: " + error.message);
       setLoading(false);
       return;
     }
@@ -63,12 +68,12 @@ export default function Gallery() {
       .filter((row) => isRenderableImageUrl(row.image_url))
       .map((row) => ({ ...row, image_url: row.image_url.trim() }));
 
-    console.log("[Gallery] Normalized items:", normalized.length, normalized.map(i => ({ label: i.label, url: i.image_url.substring(0, 50) })));
+    console.log("[Gallery] Loaded items:", normalized.length, normalized.map(i => ({ label: i.label, url: i.image_url.substring(0, 60) })));
 
     setItems(normalized);
     usePlayerStore.setState({ gallery: normalized.map((item) => item.image_url) });
     setLoading(false);
-  }, [profile?.telegram_id]);
+  }, [profile?.telegram_id, tgLoading]);
 
   useEffect(() => {
     loadGallery();
