@@ -112,6 +112,7 @@ export default function Game() {
   const [localFear, setLocalFear] = useState(0);
   const localFearRef = useRef(0); // always-fresh ref for async closures
   const [localWatermelons, setLocalWatermelons] = useState(0);
+  const localWatermelonsRef = useRef(0); // always-fresh ref for async closures
   const [exitedEarly, setExitedEarly] = useState(false);
   const exitedEarlyRef = useRef(false);
 
