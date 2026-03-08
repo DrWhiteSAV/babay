@@ -19,6 +19,7 @@ import { usePlayerStatsSync } from "./hooks/usePlayerStatsSync";
 import { AssetPreloaderProvider } from "./components/AssetPreloader";
 import { useIncomingMessageNotifier } from "./hooks/useIncomingMessageNotifier";
 import { resolveUrl } from "./utils/cachedUrl";
+import { useGroupChatsSync } from "./hooks/useGroupChatsSync";
 
 // Pages
 import Home from "./pages/Home";
@@ -65,6 +66,7 @@ function AppContent() {
   useOnlinePresence();
   useAchievements();
   useIncomingMessageNotifier();
+  useGroupChatsSync();
 
 
   // Load page backgrounds and video cutscenes from Supabase on startup

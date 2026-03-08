@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
@@ -246,13 +246,61 @@ export default function Friends() {
     setEnergyAmount(10);
   };
 
-  const handleCreateGroup = () => {
-    if (newGroupName.trim() && selectedFriends.length > 0) {
-      createGroupChat(newGroupName.trim(), selectedFriends);
-      setNewGroupName("");
-      setSelectedFriends([]);
-      setShowGroupModal(false);
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || selectedFriends.length === 0) return;
+    if (!profile?.telegram_id || !character) return;
+
+    const groupId = Date.now().toString();
+    const finalMembers = selectedFriends.includes("ДанИИл")
+      ? selectedFriends
+      : [...selectedFriends, "ДанИИл"];
+
+    // 1. Save group to DB
+    await supabase.from("group_chats").insert({
+      id: groupId,
+      name: newGroupName.trim(),
+      created_by: profile.telegram_id,
+    });
+
+    // 2. Add creator as member
+    await supabase.from("group_chat_members").upsert({
+      group_id: groupId,
+      telegram_id: profile.telegram_id,
+      character_name: character.name,
+    }, { onConflict: "group_id,telegram_id" });
+
+    // 3. Resolve telegram_ids for selected real friends and insert them
+    const realFriends = finalMembers.filter(n => n !== "ДанИИл" && n !== character.name);
+    if (realFriends.length > 0) {
+      const { data: statsRows } = await supabase
+        .from("player_stats")
+        .select("telegram_id, character_name")
+        .in("character_name", realFriends);
+
+      for (const row of statsRows || []) {
+        if (!row.telegram_id || !row.character_name) continue;
+        await supabase.from("group_chat_members").upsert({
+          group_id: groupId,
+          telegram_id: row.telegram_id,
+          character_name: row.character_name,
+        }, { onConflict: "group_id,telegram_id" });
+      }
     }
+
+    // 4. Update local store
+    createGroupChat(newGroupName.trim(), finalMembers);
+    // Override the auto-generated id with the canonical one
+    usePlayerStore.setState(s => ({
+      groupChats: s.groupChats.map(g =>
+        g.members.join(",") === finalMembers.join(",") && g.name === newGroupName.trim()
+          ? { ...g, id: groupId }
+          : g
+      ),
+    }));
+
+    setNewGroupName("");
+    setSelectedFriends([]);
+    setShowGroupModal(false);
   };
 
   const handleEditGroup = (id: string, currentName: string) => {
