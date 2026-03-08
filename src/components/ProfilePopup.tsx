@@ -36,18 +36,22 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
   const [userInventory, setUserInventory] = useState<string[]>([]);
   const [loading, setLoading] = useState((!isUser && !!telegramId) || isUser);
 
-  // Load current user's inventory from DB
+  // Load current user's inventory from player_inventory table (no cache, like gallery fix)
   useEffect(() => {
     if (!isUser || !profile?.telegram_id) {
       if (isUser) setLoading(false);
       return;
     }
+    const tid = profile.telegram_id;
     supabase
       .from("player_inventory")
       .select("item_id")
-      .eq("telegram_id", profile.telegram_id)
-      .then(({ data }) => {
-        setUserInventory((data || []).map(i => i.item_id));
+      .eq("telegram_id", tid)
+      .order("purchased_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setUserInventory(data.map(i => i.item_id));
+        }
         setLoading(false);
       });
   }, [isUser, profile?.telegram_id]);
