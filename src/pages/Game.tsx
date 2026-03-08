@@ -627,8 +627,13 @@ export default function Game() {
     if (isCorrect) {
       const fearReward = 1 + (character ? (character.telekinesisLevel - 1) * storeConfig.telekinesisRewardBonus : 0);
       // PVP real-room OR legacy local sim: track score locally, don't add to global store yet
-      if (pvpRoomId || pvpParticipants.length > 0) setLocalFear(f => f + fearReward);
-      else addFear(fearReward);
+      if (pvpRoomId || pvpParticipants.length > 0) {
+        setLocalFear(f => {
+          const next = f + fearReward;
+          localFearRef.current = next;
+          return next;
+        });
+      } else addFear(fearReward);
       setScore(s => s + 1);
       playSuccess(settings.musicVolume);
       setShowSuccessAvatar(true);
