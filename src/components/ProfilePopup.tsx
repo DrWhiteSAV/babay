@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePlayerStore } from "../store/playerStore";
 import { supabase } from "../integrations/supabase/client";
+import { useTelegram } from "../context/TelegramContext";
 
 interface ProfilePopupProps {
   name: string;
@@ -27,12 +28,31 @@ interface RemoteProfile {
 }
 
 export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopupProps) {
-  const { character, fear, energy, watermelons, bossLevel, inventory, shopItems, bossItems } = usePlayerStore();
+  const { character, fear, energy, watermelons, bossLevel, shopItems, bossItems } = usePlayerStore();
+  const { profile } = useTelegram();
   const isUser = name === character?.name || name === "user";
 
   const [remoteData, setRemoteData] = useState<RemoteProfile | null>(null);
-  const [loading, setLoading] = useState(!isUser && !!telegramId);
+  const [userInventory, setUserInventory] = useState<string[]>([]);
+  const [loading, setLoading] = useState((!isUser && !!telegramId) || isUser);
 
+  // Load current user's inventory from DB
+  useEffect(() => {
+    if (!isUser || !profile?.telegram_id) {
+      if (isUser) setLoading(false);
+      return;
+    }
+    supabase
+      .from("player_inventory")
+      .select("item_id")
+      .eq("telegram_id", profile.telegram_id)
+      .then(({ data }) => {
+        setUserInventory((data || []).map(i => i.item_id));
+        setLoading(false);
+      });
+  }, [isUser, profile?.telegram_id]);
+
+  // Load remote user data
   useEffect(() => {
     if (isUser || !telegramId) return;
     const load = async () => {
@@ -66,7 +86,6 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
 
   const isDanil = name === "ДанИИл";
 
-  // For non-DB entries (ДанИИл or unknown)
   const getMockData = (seedName: string): RemoteProfile => {
     let hash = 0;
     for (let i = 0; i < seedName.length; i++) hash = seedName.charCodeAt(i) + ((hash << 5) - hash);
@@ -87,6 +106,8 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
     };
   };
 
+  const allItems = [...shopItems, ...bossItems];
+
   const data: RemoteProfile = isUser
     ? {
         avatarUrl: character?.avatarUrl || "https://picsum.photos/seed/user/200/200",
@@ -96,12 +117,14 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
         telekinesisLevel: character?.telekinesisLevel || 1,
         bossLevel,
         lore: character?.lore || "История умалчивает...",
-        inventory,
+        inventory: userInventory,
       }
     : (remoteData || getMockData(name));
 
-  const allItems = [...shopItems, ...bossItems];
-  const userItems = data.inventory?.map(id => allItems.find(i => i.id === id || i.name === id)).filter(Boolean) || [];
+  // Resolve items by id
+  const inventoryItems = data.inventory
+    .map(id => allItems.find(i => i.id === id))
+    .filter(Boolean) as typeof allItems;
 
   const displayName = isUser ? character?.name : name;
   const tgLink = data.username ? `https://t.me/${data.username}` : null;
@@ -111,7 +134,7 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-sm w-full max-h-[80vh] overflow-y-auto flex flex-col"
+        className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4 sticky top-0 bg-neutral-900 z-10 pb-2 border-b border-neutral-800">
@@ -121,24 +144,32 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
 
         {loading ? (
           <div className="flex items-center justify-center py-16 text-neutral-500">
-            <svg className="animate-spin w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            <svg className="animate-spin w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
             Загрузка...
           </div>
         ) : (
           <div className="space-y-4">
-            <img src={data.avatarUrl} alt="avatar" className={`w-full aspect-square object-cover rounded-xl border-2 ${isUser ? 'border-red-900/50' : 'border-neutral-700'}`} />
+            <img
+              src={data.avatarUrl}
+              alt="avatar"
+              className={`w-full aspect-square object-cover rounded-xl border-2 ${isUser ? 'border-red-900/50' : 'border-neutral-700'}`}
+            />
 
             <div>
-              {/* Строка 1: Имя Фамилия @username */}
+              {/* Telegram name + username link */}
               {!isUser && !isDanil && (data.first_name || data.username) && (
                 <p className="text-sm text-neutral-400 mb-0.5">
                   {data.first_name}{data.last_name ? ` ${data.last_name}` : ""}
                   {tgLink && (
-                    <a href={tgLink} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ml-1">@{data.username}</a>
+                    <a href={tgLink} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ml-1">
+                      @{data.username}
+                    </a>
                   )}
                 </p>
               )}
-              {/* Строка 2: [Имя Бабая] тк. N */}
               <h3 className={`text-2xl font-black uppercase ${isUser ? 'text-red-500' : 'text-white'}`}>{displayName}</h3>
               <p className="text-neutral-400 text-sm">
                 {data.gender} • {data.style}
@@ -174,14 +205,24 @@ export default function ProfilePopup({ name, telegramId, onClose }: ProfilePopup
               </div>
             </div>
 
+            {/* Inventory */}
             <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-              <h4 className="text-xs font-bold text-neutral-500 uppercase mb-2">Инвентарь</h4>
-              {userItems.length > 0 ? (
+              <h4 className="text-xs font-bold text-neutral-500 uppercase mb-3">
+                Инвентарь {inventoryItems.length > 0 ? `(${inventoryItems.length})` : ""}
+              </h4>
+              {inventoryItems.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
-                  {userItems.map((item: any, i: number) => (
-                    <div key={i} className="bg-neutral-900 border border-neutral-800 rounded-lg p-2 flex flex-col items-center text-center gap-1">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xl bg-neutral-800">{item.icon}</div>
-                      <span className="text-[10px] font-bold text-white line-clamp-1">{item.name}</span>
+                  {inventoryItems.map((item, i) => (
+                    <div
+                      key={i}
+                      className="bg-neutral-900 border border-neutral-800 rounded-xl p-2 flex flex-col items-center text-center gap-1.5 hover:border-neutral-600 transition-colors"
+                    >
+                      {/* Big emoji icon like in the shop */}
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-3xl bg-neutral-800 border border-neutral-700">
+                        {item.icon}
+                      </div>
+                      <span className="text-[10px] font-bold text-white leading-tight line-clamp-2">{item.name}</span>
+                      <span className="text-[9px] text-neutral-500 line-clamp-1">{item.type}</span>
                     </div>
                   ))}
                 </div>
