@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Image as ImageIcon, Video, ShieldAlert, ShoppingCart, Users, Bot, Music, Type, BarChart3, Bell, Upload } from "lucide-react";
+import { Image as ImageIcon, Video, ShieldAlert, ShoppingCart, Users, Bot, Music, Type, BarChart3, Bell, Upload, Calendar, Trophy } from "lucide-react";
 import Header from "../components/Header";
 
 export default function Admin() {
