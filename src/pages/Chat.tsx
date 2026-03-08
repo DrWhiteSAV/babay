@@ -110,6 +110,18 @@ export default function Chat() {
 
   useEffect(() => {
     if (!chatKey) return;
+
+    // Helper to decode content that may contain [img]: prefix
+    const decodeContent = (raw: string) => {
+      if (raw.startsWith('[img]:')) {
+        const rest = raw.slice(6);
+        const nlIdx = rest.indexOf('\n');
+        if (nlIdx >= 0) return { imageUrl: rest.slice(0, nlIdx), text: rest.slice(nlIdx + 1) };
+        return { imageUrl: rest, text: '' };
+      }
+      return { imageUrl: undefined, text: raw };
+    };
+
     const load = async () => {
       const { data } = await supabase
         .from("chat_messages")
@@ -118,14 +130,22 @@ export default function Chat() {
         .order("created_at", { ascending: true })
         .limit(100);
       if (data) {
-        setMessages(data.map(m => ({
-          id: m.id,
-          sender: m.role === 'user' ? 'user' : m.friend_name,
-          text: m.content,
-          sender_telegram_id: (m as any).sender_telegram_id,
-          read_at: (m as any).read_at,
-          created_at: m.created_at,
-        })));
+        setMessages(data.map(m => {
+          const decoded = decodeContent(m.content);
+          const senderId = (m as any).sender_telegram_id;
+          const sender = m.role === 'user'
+            ? (senderId === profile?.telegram_id ? 'user' : m.friend_name)
+            : m.friend_name;
+          return {
+            id: m.id,
+            sender,
+            text: decoded.text,
+            imageUrl: decoded.imageUrl,
+            sender_telegram_id: senderId,
+            read_at: (m as any).read_at,
+            created_at: m.created_at,
+          };
+        }));
       }
     };
     load();
@@ -134,10 +154,12 @@ export default function Chat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `chat_key=eq.${chatKey}` },
         (payload) => {
           const m = payload.new as any;
+          const decoded = decodeContent(m.content);
           const msg: Message = {
             id: m.id,
             sender: m.role === 'user' ? (m.sender_telegram_id === profile?.telegram_id ? 'user' : m.friend_name) : m.friend_name,
-            text: m.content,
+            text: decoded.text,
+            imageUrl: decoded.imageUrl,
             sender_telegram_id: m.sender_telegram_id,
             read_at: m.read_at,
             created_at: m.created_at,
@@ -147,10 +169,11 @@ export default function Chat() {
             return [...prev, msg];
           });
           if (m.sender_telegram_id !== profile?.telegram_id) {
+            const previewText = decoded.imageUrl ? '📷 Фото' : decoded.text.slice(0, 80);
             pushNotification({
               type: 'chat',
               title: `💬 Новое сообщение`,
-              message: `${m.friend_name}: ${m.content.slice(0, 80)}`,
+              message: `${m.friend_name}: ${previewText}`,
             });
           }
         }
