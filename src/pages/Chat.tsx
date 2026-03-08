@@ -237,15 +237,14 @@ export default function Chat() {
     };
     load();
 
-    // Subscribe — deduplicate by real DB id AND by pending_ prefix swap
+    // Subscribe — server-side filter by chat_key for reliable AI-substitute message delivery
     const channel = supabase
       .channel(`chat_${chatKey}_${Date.now()}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `chat_key=eq.${chatKey}` },
         (payload) => {
           const m = payload.new as any;
-          if (m.chat_key !== chatKey) return;
           const decoded = decodeContent(m.content);
           const msg: Message = {
             id: m.id,
@@ -276,9 +275,20 @@ export default function Chat() {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `chat_key=eq.${chatKey}` },
+        (payload) => {
+          const m = payload.new as any;
+          // Update read_at status for delivered messages
+          setMessages(prev => prev.map(p => p.id === m.id ? { ...p, read_at: m.read_at } : p));
+        }
+      )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[Chat] Realtime channel error, falling back to polling');
+          console.warn('[Chat] Realtime channel error — reloading messages');
+          // Fallback: reload from DB on error
+          load();
         }
       });
 
@@ -757,10 +767,14 @@ export default function Chat() {
               )}
 
               <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[78%]`}>
-                {/* Sender name (group only) */}
-                {group && !isUser && showAvatar && (
+                {/* Sender name — shown above every bubble for all chat types */}
+                {isUser ? (
+                  <span className="text-[10px] text-neutral-500 mb-0.5 mr-1 opacity-70">
+                    {character?.name || "Я"}
+                  </span>
+                ) : (
                   <span
-                    className="text-[10px] text-neutral-400 mb-1 ml-1 cursor-pointer hover:text-white transition-colors"
+                    className="text-[10px] text-neutral-400 mb-0.5 ml-1 cursor-pointer hover:text-white transition-colors"
                     onClick={() => setShowProfilePopup({ name: msg.sender, telegramId: msg.sender_telegram_id ?? undefined })}
                   >{msg.sender}</span>
                 )}
