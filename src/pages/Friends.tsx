@@ -181,15 +181,26 @@ export default function Friends() {
     const nameToAdd = foundUser.character_name || foundUser.first_name;
     addFriend(nameToAdd);
     if (profile?.telegram_id) {
+      const myName = character?.name || "";
+
+      // Insert A→B
       const { error } = await supabase.from("friends").upsert({
         telegram_id: profile.telegram_id,
         friend_name: nameToAdd,
         friend_telegram_id: foundUser.telegram_id,
       }, { onConflict: "telegram_id,friend_name" });
       if (error) console.error("Friend save error:", error);
-      else {
-        notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
+
+      // Insert B→A (mutual) — only if the other user has a character
+      if (myName && foundUser.telegram_id) {
+        await supabase.from("friends").upsert({
+          telegram_id: foundUser.telegram_id,
+          friend_name: myName,
+          friend_telegram_id: profile.telegram_id,
+        }, { onConflict: "telegram_id,friend_name" });
       }
+
+      notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
     }
     setNewFriendInput("");
     setSearchStatus("idle");
@@ -585,11 +596,12 @@ export default function Friends() {
       {/* Energy Gift Modal */}
       <AnimatePresence>
         {energyModal && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4">
+          <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-6">
             <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 60, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="w-full max-w-sm rounded-2xl p-6 space-y-5"
               style={{
                 background: "linear-gradient(180deg, rgba(30,30,40,0.97), rgba(20,20,30,0.99))",
