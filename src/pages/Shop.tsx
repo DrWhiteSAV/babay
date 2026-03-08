@@ -501,7 +501,7 @@ export default function Shop() {
             {!avatarEvolvePopup.isGenerating && (
               <button
                 onClick={() => setAvatarEvolvePopup(null)}
-                className="mt-4 w-full max-w-sm py-3 bg-purple-800 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors"
+                className="mt-4 w-full max-w-sm py-3 bg-purple-800 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors shop-evolve-btn"
               >
                 {avatarEvolvePopup.newAvatar ? "Отлично!" : "Закрыть"}
               </button>
