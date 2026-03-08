@@ -46,6 +46,10 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
 
+  // Reset dialog state
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [snapshotName, setSnapshotName] = useState("");
+
   // History state
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
