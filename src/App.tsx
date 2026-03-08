@@ -248,6 +248,7 @@ function AppContent() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/chats" element={<Chats />} />
           <Route path="/admin" element={<AdminGuard><Admin /></AdminGuard>} />
           <Route path="/admin/pic" element={<AdminGuard><AdminPic /></AdminGuard>} />
           <Route path="/admin/video" element={<AdminGuard><AdminVideo /></AdminGuard>} />
