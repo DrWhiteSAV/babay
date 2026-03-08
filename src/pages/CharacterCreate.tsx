@@ -924,7 +924,7 @@ export default function CharacterCreate() {
               {/* DB Templates grid */}
               <div className="mt-4">
                 <p className="text-xs text-neutral-500 mb-3 text-center">
-                  — или выбери шаблон ({gender}) —
+                  — или выбери шаблон ({gender}{style ? ` · ${style}` : ""}) —
                 </p>
                 {loadingTemplates ? (
                   <div className="flex justify-center py-4"><Loader2 size={20} className="animate-spin text-red-500" /></div>
@@ -941,7 +941,13 @@ export default function CharacterCreate() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-neutral-600 text-center py-3">Нет шаблонов — сгенерируй первый!</p>
+                  <div className="flex flex-col items-center gap-2 py-4">
+                    <div className="text-5xl">👻</div>
+                    <p className="text-xs text-neutral-500 text-center">
+                      Нет шаблонов для {gender}{style ? ` · ${style}` : ""}<br/>
+                      <span className="text-neutral-600">Сгенерируй первый аватар!</span>
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
