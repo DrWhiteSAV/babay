@@ -12,6 +12,7 @@ import {
   Skull,
   Zap,
   Image as ImageIcon,
+  MessageSquare,
 } from "lucide-react";
 import CurrencyModal, { CurrencyType } from "../components/CurrencyModal";
 
