@@ -193,9 +193,10 @@ export default function Chat() {
 
   useEffect(() => {
     // For DM chats: wait until friendTelegramId is resolved so chatKey is canonical (tid_tid)
+    // Exception: ДанИИл is AI-only and never has a real telegram_id — proceed immediately with ai_ key
     // For group chats: chatKey is always ready immediately
     if (!chatKey) return;
-    if (friendName && !friendTelegramId) return; // DM — wait for friend's telegram_id
+    if (friendName && !friendTelegramId && !isDanil) return; // DM — wait for friend's telegram_id
 
     // Helper to decode content that may contain [img]: prefix
     const decodeContent = (raw: string) => {
