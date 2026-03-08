@@ -235,7 +235,7 @@ function AppContent() {
         } : {}}
       >
         <NotificationPopupProvider />
-        {!hasSeenInitialCutscene && (
+        {!hasSeenInitialCutscene && entryMode !== "lovable" && (
           <CutscenePlayer onComplete={() => setHasSeenInitialCutscene(true)} />
         )}
         <style>{`
