@@ -1256,5 +1256,8 @@ export default function Game() {
         </div>
       )}
     </div>
+      {showDanilProfile && (
+        <ProfilePopup name="ДанИИл" onClose={() => setShowDanilProfile(false)} />
+      )}
   );
 }
