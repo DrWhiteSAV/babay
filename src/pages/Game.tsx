@@ -475,7 +475,7 @@ export default function Game() {
     if (isBossStage(currentStage, currentDiff)) {
       setIsLoading(false);
       setStageCountdown(0);
-      await launchBossPreparation(currentStage, charData);
+      launchBossPreparation(currentStage, charData);
       return;
     }
 
