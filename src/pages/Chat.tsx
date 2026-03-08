@@ -203,8 +203,7 @@ export default function Chat() {
     };
     load();
 
-    // Subscribe without filter — filter server-side filter requires REPLICA IDENTITY FULL
-    // Instead we filter by chat_key client-side for reliability
+    // Subscribe — deduplicate by real DB id AND by pending_ prefix swap
     const channel = supabase
       .channel(`chat_${chatKey}_${Date.now()}`)
       .on(
@@ -212,7 +211,6 @@ export default function Chat() {
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const m = payload.new as any;
-          // Client-side filter: only process messages for this chat
           if (m.chat_key !== chatKey) return;
           const decoded = decodeContent(m.content);
           const msg: Message = {
@@ -227,13 +225,24 @@ export default function Chat() {
             created_at: m.created_at,
           };
           setMessages(prev => {
+            // Already present with real ID
             if (prev.some(p => p.id === msg.id)) return prev;
+            // Replace any pending_ placeholder that matches this content + sender
+            const pendingIdx = prev.findIndex(p =>
+              p.id.startsWith('pending_') &&
+              p.text === msg.text &&
+              p.imageUrl === msg.imageUrl
+            );
+            if (pendingIdx !== -1) {
+              const next = [...prev];
+              next[pendingIdx] = { ...next[pendingIdx], id: msg.id, read_at: msg.read_at, created_at: msg.created_at };
+              return next;
+            }
             return [...prev, msg];
           });
         }
       )
       .subscribe((status) => {
-        // If subscription fails, fallback: re-fetch messages every 5s
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[Chat] Realtime channel error, falling back to polling');
         }
