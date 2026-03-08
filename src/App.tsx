@@ -50,6 +50,7 @@ import { useTelegram } from "./context/TelegramContext";
 function AppContent() {
   const { entryMode, isLoading } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
+  const [assetsPreloaded, setAssetsPreloaded] = useState(false);
   const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds, setPageBackground, setVideoCutscenes } = usePlayerStore();
   const { playClick } = useAudio(settings.musicVolume);
   const location = useLocation();
