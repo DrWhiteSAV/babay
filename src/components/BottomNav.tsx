@@ -8,37 +8,35 @@ import { useTelegram } from "../context/TelegramContext";
 
 function useUnreadCount() {
   const { profile } = useTelegram();
-  const { friends, groupChats } = usePlayerStore();
+  const { groupChats } = usePlayerStore();
   const [count, setCount] = useState(0);
-  const [friendTidMap, setFriendTidMap] = useState<Record<string, number>>({});
+  const [friendTids, setFriendTids] = useState<number[]>([]);
 
-  // Load friend telegram_ids for correct canonical chat key construction
+  // Load friend telegram_ids directly from `friends` table — most reliable source
   useEffect(() => {
     if (!profile?.telegram_id) return;
-    const realFriends = friends.filter(f => f.name !== "ДанИИл");
-    if (realFriends.length === 0) return;
     supabase
-      .from("player_stats")
-      .select("telegram_id, character_name")
-      .in("character_name", realFriends.map(f => f.name))
+      .from("friends")
+      .select("friend_telegram_id")
+      .eq("telegram_id", profile.telegram_id)
       .then(({ data }) => {
-        if (!data) return;
-        const map: Record<string, number> = {};
-        for (const row of data) {
-          if (row.character_name && row.telegram_id) map[row.character_name] = row.telegram_id;
-        }
-        setFriendTidMap(map);
+        const tids = (data || [])
+          .map(r => r.friend_telegram_id)
+          .filter(Boolean) as number[];
+        setFriendTids(tids);
       });
-  }, [profile?.telegram_id, friends.length]);
+  }, [profile?.telegram_id]);
 
   useEffect(() => {
     if (!profile?.telegram_id) return;
 
     const fetchUnread = async () => {
+      const myTid = profile.telegram_id;
+
       // Personal chat keys: canonical sorted tid_tid
-      const personalKeys = friends
-        .filter(f => f.name !== "ДанИИл" && friendTidMap[f.name])
-        .map(f => [String(profile.telegram_id), String(friendTidMap[f.name])].sort().join("_"));
+      const personalKeys = friendTids.map(tid =>
+        [String(myTid), String(tid)].sort().join("_")
+      );
 
       // Group chat keys
       const groupKeys = groupChats.map(g => `group_${g.id}`);
@@ -50,7 +48,7 @@ function useUnreadCount() {
         .from("chat_messages")
         .select("id", { count: "exact", head: true })
         .in("chat_key", allKeys)
-        .neq("sender_telegram_id", profile.telegram_id)
+        .neq("sender_telegram_id", myTid)
         .is("read_at", null);
 
       setCount(unread || 0);
@@ -58,7 +56,6 @@ function useUnreadCount() {
 
     fetchUnread();
 
-    // Re-check every 30s and on realtime inserts
     const channel = supabase
       .channel("unread_badge")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, fetchUnread)
@@ -70,7 +67,7 @@ function useUnreadCount() {
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [profile?.telegram_id, friends.length, groupChats.length, friendTidMap]);
+  }, [profile?.telegram_id, friendTids, groupChats.length]);
 
   return count;
 }
