@@ -380,7 +380,7 @@ export default function Game() {
           setBgImage(bgUrl);
           setBgGenRetry(false);
           // Save to gallery [backgrounds] via saveImageToGallery (unified approach)
-          const activeTgId = tgId ?? profile?.telegram_id;
+          const activeTgId = tgIdRef.current ?? tgId;
           console.log(`[Game] 🖼 background ready, tgId=${activeTgId}, saving to gallery...`);
           if (activeTgId) {
             saveImageToGallery(bgUrl, activeTgId, `[backgrounds] Фон: ${diff}`, (bgResult as any).prompt)
