@@ -126,6 +126,26 @@ export default function CharacterCreate() {
     else if (wishes.length < 4) setWishes([...wishes, wish]);
   };
 
+  // Check uniqueness against gallery labels (all users' avatar names)
+  const checkNameInGallery = async (name: string): Promise<boolean> => {
+    try {
+      const nameLower = name.toLowerCase();
+      const { data } = await supabase
+        .from("gallery")
+        .select("label")
+        .ilike("label", `%[avatars]%`);
+      if (!data) return false;
+      return data.some(r => {
+        if (!r.label) return false;
+        // Extract name part: "[avatars] Name | Lore" or "[avatars] Name"
+        const match = r.label.replace(/^\[avatars\]\s*/i, "").split("|")[0].trim().toLowerCase();
+        return match === nameLower;
+      });
+    } catch {
+      return false;
+    }
+  };
+
   const ensureUniqueName = async (baseName: string): Promise<{ finalName: string; isDuplicate: boolean }> => {
     try {
       const { data } = await supabase
@@ -133,7 +153,8 @@ export default function CharacterCreate() {
         .select("character_name")
         .ilike("character_name", `${baseName}%`);
       const existing = (data || []).map(r => r.character_name?.toLowerCase());
-      if (!existing.includes(baseName.toLowerCase())) {
+      const inGallery = await checkNameInGallery(baseName);
+      if (!existing.includes(baseName.toLowerCase()) && !inGallery) {
         return { finalName: baseName, isDuplicate: false };
       }
       let i = 2;
@@ -144,12 +165,15 @@ export default function CharacterCreate() {
     }
   };
 
-  const doGenerateName = useCallback(async (g: Gender) => {
+  const doGenerateName = useCallback(async (g: Gender, excludedNames: string[] = []) => {
     setIsGeneratingName(true);
     setNameTimeout(false);
     setNameCountdown(NAME_TIMEOUT);
     const genderDesc = g === "Бабай" ? "мужской" : "женский";
-    const prompt = `Придумай одно уникальное, жутковатое и немного абсурдное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Например: "Дзяка Мокрая", "Журон Подвальный", "Хрыпач Чердачный", "Кряхта Ржавая". Для ${genderDesc} рода используй соответствующее окончание прилагательного. Запрещены слова: "Бабай", "Дух", "Леший". Верни ТОЛЬКО имя (2 слова), без пояснений, кавычек, нумерации.`;
+    const excludeStr = excludedNames.length > 0
+      ? ` Запрещено использовать уже занятые имена: ${excludedNames.join(", ")}.`
+      : "";
+    const prompt = `Придумай одно уникальное, жутковатое и немного абсурдное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Например: "Дзяка Мокрая", "Журон Подвальный", "Хрыпач Чердачный", "Кряхта Ржавая". Для ${genderDesc} рода используй соответствующее окончание прилагательного. Запрещены слова: "Бабай", "Дух", "Леший".${excludeStr} Верни ТОЛЬКО имя (2 слова), без пояснений, кавычек, нумерации.`;
 
     let timedOut = false;
     let resolved = false;
@@ -165,8 +189,16 @@ export default function CharacterCreate() {
         .trim();
       const baseName = cleaned && !/пижам/i.test(cleaned) ? cleaned : (g === "Бабай" ? "Бурьяник Лунный" : "Тьмарица Сырая");
       const { finalName, isDuplicate } = await ensureUniqueName(baseName);
+      if (isDuplicate) {
+        // Name is taken — retry once with memory of excluded names
+        const newExcluded = [...excludedNames, baseName];
+        setNameCountdown(0);
+        setIsGeneratingName(false);
+        await doGenerateName(g, newExcluded);
+        return;
+      }
       setGeneratedName(finalName);
-      setNameHasDuplicate(isDuplicate);
+      setNameHasDuplicate(false);
       setNameLocked(true);
       setNameCountdown(0);
       setIsGeneratingName(false);
@@ -276,7 +308,7 @@ export default function CharacterCreate() {
     setLoreCountdown(LORE_TIMEOUT);
 
     const genderDesc = g === "Бабай" ? "мужской" : "женский";
-    const prompt = `Напиши короткую историю происхождения (3-4 предложения) для славянского духа по имени ${name} (пол: ${genderDesc}), визуальный стиль мира: ${s}. Объясни, откуда взялось такое странное имя. Упомяни длинный язык и телекинез. История должна быть атмосферной, жуткой и немного абсурдной. Верни только текст истории без заголовков.`;
+    const prompt = `Придумай короткую историю происхождения (3-4 предложения) для персонажа-духа по имени ${name} (пол: ${genderDesc}). Атмосфера: ${s}. Объясни, откуда взялось такое странное имя. Упомяни, что у персонажа длинный язык больше метра и способность к телекинезу. Стиль текста: жуткий, абсурдный, немного юмористический. Отвечай только текстом истории, без заголовков, без подписей, без описания внешности и без рисунков.`;
 
     let timedOut = false;
     let resolved = false;
