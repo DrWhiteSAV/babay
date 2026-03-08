@@ -202,7 +202,7 @@ export const usePlayerStore = create<PlayerState>()(
       bossItems: DEFAULT_BOSS_ITEMS,
       storeConfig: DEFAULT_STORE_CONFIG,
       dbLoaded: false,
-      gameStatus: "playing",
+      gameStatus: "loading", // Start as "loading" — NEVER "playing" before DB check
       setCharacter: (char) => {
         set({ character: char });
       },
@@ -395,8 +395,8 @@ export const usePlayerStore = create<PlayerState>()(
       }
     }),
     {
-      // Version bumped to "v2" to invalidate old cache that may contain stale settings
-      name: "babai-ui-prefs-v2",
+      // Version bumped to "v3" to invalidate old cache that may contain stale gameStatus
+      name: "babai-ui-prefs-v3",
       // DO NOT persist settings — they always come from DB (custom_settings in player_stats)
       // DO NOT persist character/stats — always loaded from DB on mount
       partialize: (state) => ({
@@ -418,8 +418,9 @@ export const usePlayerStore = create<PlayerState>()(
   ),
 );
 
-// Invalidate old cache key on startup
+// Invalidate old cache keys on startup
 if (typeof window !== "undefined") {
   try { localStorage.removeItem("babai-ui-prefs"); } catch {}
+  try { localStorage.removeItem("babai-ui-prefs-v2"); } catch {}
 }
 
