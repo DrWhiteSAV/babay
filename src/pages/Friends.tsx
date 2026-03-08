@@ -80,18 +80,6 @@ export default function Friends() {
   );
   const onlineMap = useFriendOnlineStatus(friendTelegramIds);
 
-  // Build all chat keys and get per-chat unread counts
-  const allChatKeys = useMemo(() => {
-    const myTid = profile?.telegram_id;
-    if (!myTid) return [];
-    const dmKeys = friends
-      .filter(f => f.name !== "ДанИИл" && friendsMeta[f.name]?.telegram_id)
-      .map(f => [String(myTid), String(friendsMeta[f.name].telegram_id!)].sort().join("_"));
-    const groupKeys = groupChats.map(g => `group_${g.id}`);
-    return [...dmKeys, ...groupKeys];
-  }, [profile?.telegram_id, friends, friendsMeta, groupChats]);
-
-  const perChatUnread = usePerChatUnread(profile?.telegram_id, allChatKeys);
 
   useEffect(() => {
     if (!profile?.telegram_id) return;
