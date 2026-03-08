@@ -230,6 +230,8 @@ export function usePlayerStatsSync() {
   useEffect(() => {
     if (!profile?.telegram_id || !store.character) return;
     if (!hasLoadedFromDB.current) return;
+    // CRITICAL: Never write to DB if game_status is 'reset' — prevents stale data from overwriting a reset
+    if (store.gameStatus === "reset") return;
 
     const currentAvatar = isHttpUrl(store.character.avatarUrl)
       ? store.character.avatarUrl
