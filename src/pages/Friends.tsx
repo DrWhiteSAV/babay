@@ -573,14 +573,49 @@ export default function Friends() {
           )}
         </section>
 
-        {/* Friends List */}
-        <section>
           <h2 className="text-lg font-bold mb-4 text-white">Список друзей ({friends.length})</h2>
-          {friends.length === 0 ? (
-            <p className="text-center text-neutral-500 py-8">У вас пока нет друзей. Пригласите кого-нибудь!</p>
-          ) : (
-            <div className="space-y-3">
-              {friends.map((friend) => {
+          {/* ДанИИл — hardcoded built-in AI friend, always first */}
+          <div className="space-y-3">
+            {/* ДанИИл block */}
+            <div className="bg-neutral-900/80 backdrop-blur-md p-3 rounded-xl border border-green-900/30 flex flex-col gap-2">
+              <div className="flex items-center gap-2 w-full min-w-0">
+                <div className="relative shrink-0">
+                  <img
+                    src="https://i.ibb.co/rKGSq544/image.png"
+                    alt="ДанИИл"
+                    className="w-10 h-10 rounded-full object-cover border border-green-700/50 cursor-pointer"
+                    onClick={() => setShowProfilePopup({ name: "ДанИИл" })}
+                  />
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-neutral-900 bg-green-400 shadow-[0_0_5px_#4ade80]" />
+                </div>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer overflow-hidden"
+                  onClick={() => setShowProfilePopup({ name: "ДанИИл" })}
+                >
+                  <p className="font-bold text-white text-sm truncate leading-tight">
+                    ДанИИл <span className="text-xs text-green-400 font-normal ml-1">ИИ-куратор</span>
+                  </p>
+                  <p className="text-[11px] text-neutral-400 truncate leading-tight">Руководитель BABAI · Всегда онлайн</p>
+                </div>
+                <div className="flex gap-1 shrink-0 items-center">
+                  <button
+                    onClick={() => setEnergyModal({ friendName: "ДанИИл" })}
+                    className="p-2 bg-neutral-800 hover:bg-yellow-900/40 rounded-lg text-yellow-500 transition-colors"
+                    title="Поделиться энергией"
+                  ><Zap size={15} /></button>
+                  <button
+                    onClick={() => navigate("/chat", { state: { friendName: "ДанИИл" } })}
+                    className="relative p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-blue-400 transition-colors"
+                    title="Чат"
+                  >
+                    <MessageSquare size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Regular friends */}
+            {friends.filter(f => f.name !== "ДанИИл").map((friend) => {
                   const meta = friendsMeta[friend.name] || {};
                 const isDanil = friend.name === "ДанИИл";
                 const avatarSrc = isDanil ? "https://i.ibb.co/rKGSq544/image.png" : (meta.avatar_url || `https://picsum.photos/seed/${friend.name}/100/100`);

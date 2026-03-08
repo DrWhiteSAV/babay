@@ -811,7 +811,8 @@ export default function Chat() {
       <div className="chat-input-glass p-3 relative z-20">
 
         {/* AI Substitute Banner — shown above input when enabled (personal chats only) */}
-        {friend && (
+        {/* For ДанИИл: always AI, hide the substitute toggle */}
+        {friend && !isDanil && (
           <AnimatePresence>
             {isAiSubstitute ? (
               <motion.div
