@@ -362,7 +362,7 @@ export default function Gallery() {
                 {selectedImage.image_url}
               </p>
 
-              <div className="mt-3 mb-2 flex justify-center gap-2 flex-wrap">
+              <div className="mt-3 mb-20 flex justify-center gap-2 flex-wrap">
                 {getCategory(selectedImage) === "avatars" && character && (
                   <button
                     onClick={handleSetAsAvatar}
