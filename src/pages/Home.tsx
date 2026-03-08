@@ -22,32 +22,60 @@ export default function Home() {
     let cancelled = false;
     setHasCharacter(null); // reset on every check
 
-    const checkDB = async () => {
+    const checkDB = async (attempt = 1) => {
       try {
         const { data, error } = await supabase
           .from("player_stats")
-          .select("character_name, game_status")
+          .select("character_name, game_status, telekinesis_level, character_style")
           .eq("telegram_id", profile.telegram_id)
           .maybeSingle();
 
         if (cancelled) return;
 
         if (error) {
-          console.error("[Home] DB check error:", error.message);
-          setHasCharacter(false); // safer to send to /create than loop
+          console.error(`[Home] DB check error (attempt ${attempt}):`, error.message);
+          // Retry once on network error
+          if (attempt < 2) {
+            setTimeout(() => { if (!cancelled) checkDB(2); }, 1500);
+            return;
+          }
+          // On persistent error — show НАЧАТЬ to avoid stuck loading
+          setHasCharacter(false);
+          return;
+        }
+
+        console.log("[Home] DB check result:", {
+          telegram_id: profile.telegram_id,
+          game_status: data?.game_status,
+          character_name: data?.character_name,
+          character_style: data?.character_style,
+          telekinesis_level: data?.telekinesis_level,
+        });
+
+        if (!data) {
+          console.log("[Home] No player_stats row found → НАЧАТЬ");
+          setHasCharacter(false);
           return;
         }
 
         // game_status='reset' or 'creating'/'new' → treat as new user
         const blockedStatuses = ["reset", "creating", "new"];
-        const isBlocked = blockedStatuses.includes(data?.game_status ?? "");
-        const hasName = !!(data?.character_name && data.character_name.trim().length > 0);
+        const isBlocked = blockedStatuses.includes(data.game_status ?? "");
+        const hasName = !!(data.character_name && data.character_name.trim().length > 0);
         // Only show CONTINUE if status is explicitly 'playing' AND name exists
-        const exists = !isBlocked && hasName && data?.game_status === "playing";
+        const exists = !isBlocked && hasName && data.game_status === "playing";
+
+        console.log("[Home] hasCharacter →", exists, `(blocked=${isBlocked}, hasName=${hasName}, status=${data.game_status})`);
         setHasCharacter(exists);
       } catch (err) {
         console.error("[Home] Unexpected error:", err);
-        if (!cancelled) setHasCharacter(false);
+        if (!cancelled) {
+          if (attempt < 2) {
+            setTimeout(() => { if (!cancelled) checkDB(2); }, 1500);
+          } else {
+            setHasCharacter(false);
+          }
+        }
       }
     };
 
