@@ -21,9 +21,6 @@ export default function GameHub() {
   const location = useLocation();
   const { character, fear, energy, watermelons, globalBackgroundUrl, pageBackgrounds } = usePlayerStore();
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
-  usePlayerStatsSync();
-
-
   if (!character) {
     navigate("/");
     return null;
