@@ -99,6 +99,7 @@ export default function Game() {
   const [chatMessages, setChatMessages] = useState<{ sender: "user" | "danil"; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isDanilTyping, setIsDanilTyping] = useState(false);
+  const [showDanilProfile, setShowDanilProfile] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // PVP State
