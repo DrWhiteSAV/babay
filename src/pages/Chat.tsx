@@ -523,10 +523,18 @@ export default function Chat() {
     if (!isRetry) setPendingRetry(null);
     startAiCountdown();
     try {
-      const responseText = await generateFriendChat(
-        userMessage, responder, character!, character?.style || "Обычная",
-        recentMessages, imageToSend || undefined, profile?.telegram_id
-      );
+      let responseText: string;
+      if (isSubstituteCall) {
+        // AI writes AS ME — use generateMyAiReply with stable telegramId (mine)
+        responseText = await generateMyAiReply(
+          responder, character!, recentMessages, profile?.telegram_id
+        );
+      } else {
+        responseText = await generateFriendChat(
+          userMessage, responder, character!, character?.style || "Обычная",
+          recentMessages, imageToSend || undefined, profile?.telegram_id
+        );
+      }
       if (aiResolvedRef.current && isRetry === false) return;
       stopAiCountdown();
       aiResolvedRef.current = true;
