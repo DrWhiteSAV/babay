@@ -165,8 +165,22 @@ export default function Home() {
         )}
       </div>
 
-      <div className="absolute bottom-6 text-center w-full text-neutral-600 text-xs">
-        v1.0.0 &copy; 2026 Bab-AI.ru
+      <div className="absolute bottom-4 text-center w-full flex flex-col items-center gap-2">
+        <div className="text-neutral-600 text-xs">v1.0.0 &copy; 2026 Bab-AI.ru</div>
+        <button
+          onClick={() => {
+            try {
+              localStorage.removeItem("babai-ui-prefs-v4");
+              localStorage.removeItem("babai-ui-prefs");
+              localStorage.removeItem("babai-ui-prefs-v2");
+              localStorage.removeItem("babai-ui-prefs-v3");
+            } catch {}
+            window.location.reload();
+          }}
+          className="text-neutral-700 text-[10px] hover:text-neutral-500 transition-colors underline"
+        >
+          Сбросить кэш
+        </button>
       </div>
     </motion.div>
   );
