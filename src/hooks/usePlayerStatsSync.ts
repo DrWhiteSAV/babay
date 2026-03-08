@@ -124,6 +124,7 @@ export function usePlayerStatsSync() {
           console.error("[usePlayerStatsSync] player_stats load error:", error.message);
           // Even on error, mark as loaded so sync doesn't hang
           usePlayerStore.setState({ dbLoaded: true, gameStatus: "playing" });
+          dbLoadedAtRef.current = Date.now();
           return;
         }
 
