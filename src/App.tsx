@@ -188,9 +188,6 @@ function AppContent() {
 
   return (
     <>
-      {!assetsPreloaded && (
-        <AssetPreloader onComplete={() => setAssetsPreloaded(true)} />
-      )}
       <div 
         className={`min-h-[100dvh] bg-neutral-950 text-neutral-100 ${fontClass} ${themeClass} selection:bg-red-900 selection:text-white ${buttonSizeClass}`}
         style={activeBgUrl ? {
@@ -201,7 +198,7 @@ function AppContent() {
         } : {}}
       >
         <NotificationPopupProvider />
-        {assetsPreloaded && !hasSeenInitialCutscene && (
+        {!hasSeenInitialCutscene && (
           <CutscenePlayer onComplete={() => setHasSeenInitialCutscene(true)} />
         )}
         <style>{`
