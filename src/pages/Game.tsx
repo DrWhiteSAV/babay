@@ -301,40 +301,45 @@ export default function Game() {
     }
 
     if (character) {
-      // Generate scenario text (separately from any image generation)
-      const newScenario = await generateScenario(
-        currentStage,
-        difficulty || "Сложная",
-        character.style,
-        tgId,
-      );
-      setScenario(newScenario);
+      setAiRetry(false);
+      setPendingRetryStage(currentStage);
+      // 30s timeout — show retry button if no response
+      if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+      aiTimeoutRef.current = setTimeout(() => {
+        setAiRetry(true);
+        setIsLoading(false);
+      }, 30000);
 
-      // Generate spooky voice for the scenario
-      if (settings.ttsEnabled) {
-        generateSpookyVoice(newScenario.text).then((audioData) => {
-          if (audioData && audioRef.current && !isLoading) {
-            audioRef.current.src = audioData;
-            const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
-            if (hasInteracted) {
-              audioRef.current
-                .play()
-                .catch((e) => console.log("Audio play blocked", e));
+      try {
+        const newScenario = await generateScenario(
+          currentStage,
+          difficulty || "Сложная",
+          character.style,
+          tgId,
+        );
+        clearTimeout(aiTimeoutRef.current!);
+        setAiRetry(false);
+
+        if (!newScenario?.text || !newScenario?.options?.length) {
+          setAiRetry(true);
+          setIsLoading(false);
+          return;
+        }
+        setScenario(newScenario);
+
+        if (settings.ttsEnabled) {
+          generateSpookyVoice(newScenario.text).then((audioData) => {
+            if (audioData && audioRef.current) {
+              audioRef.current.src = audioData;
+              audioRef.current.play().catch(() => {});
             }
-          } else if (!audioData && !isLoading) {
-            if ('speechSynthesis' in window) {
-              const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
-              if (hasInteracted) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(newScenario.text);
-                utterance.lang = 'ru-RU';
-                utterance.pitch = 0.5;
-                utterance.rate = 0.9;
-                window.speechSynthesis.speak(utterance);
-              }
-            }
-          }
-        });
+          });
+        }
+      } catch (e) {
+        clearTimeout(aiTimeoutRef.current!);
+        setAiRetry(true);
+        setIsLoading(false);
+        return;
       }
     }
     setIsLoading(false);
