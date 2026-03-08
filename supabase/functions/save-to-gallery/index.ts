@@ -172,10 +172,31 @@ serve(async (req) => {
 
     // 7. Send to Telegram
     if (BOT_TOKEN) {
-      const displayName = cleanName || (label || "Бабай").replace(/^\[.*?\]\s*/i, "").replace(/^Аватар:\s*/i, "");
-      const caption = lore
-        ? `🧟 *${displayName}*\n\n${lore.substring(0, 900)}`
-        : `🖼 ${displayName}`;
+      const labelLower2 = (label || "").toLowerCase();
+      const isBackground = labelLower2.includes("[background") || labelLower2.includes("фон");
+      const isBoss = labelLower2.includes("[boss");
+
+      let caption: string;
+      if (isAvatar && cleanName) {
+        caption = lore
+          ? `🧟 *${cleanName}*\n\n${lore.substring(0, 900)}`
+          : `🧟 *${cleanName}*`;
+      } else if (isBackground) {
+        const displayLabel = (label || "Фон").replace(/^\[.*?\]\s*/i, "").trim();
+        caption = prompt
+          ? `🌆 *${displayLabel}*\n\n_${prompt.substring(0, 700)}_`
+          : `🌆 *${displayLabel}*`;
+      } else if (isBoss) {
+        const displayLabel = (label || "Босс").replace(/^\[.*?\]\s*/i, "").trim();
+        caption = prompt
+          ? `👹 *${displayLabel}*\n\n_${prompt.substring(0, 700)}_`
+          : `👹 *${displayLabel}*`;
+      } else {
+        const displayName2 = cleanName || (label || "Изображение").replace(/^\[.*?\]\s*/i, "").replace(/^Аватар:\s*/i, "");
+        caption = prompt
+          ? `🖼 *${displayName2}*\n\n_${prompt.substring(0, 700)}_`
+          : `🖼 *${displayName2}*`;
+      }
 
       const formData = new FormData();
       formData.append("chat_id", telegramId.toString());
