@@ -35,7 +35,10 @@ export type FontFamily =
   | "Rubik Glitch"
   | "Neucha"
   | "Ruslan Display"
-  | "Tektur";
+  | "Tektur"
+  | "Special Elite"
+  | "Cinzel Decorative"
+  | "Nunito";
 export type Theme = "normal" | "cyberpunk" | "horror" | "steampunk" | "anime" | "soviet" | "fairytale" | "cartoon" | "fantasy";
 
 export interface Character {
@@ -237,13 +240,13 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       if (newSettings.theme && newSettings.theme !== state.settings.theme) {
         const themeDefaultFont: Record<string, import("./playerStore").FontFamily> = {
           cyberpunk: "Tektur",
-          horror: "Rubik Beastly",
+          horror: "Special Elite",
           steampunk: "Playfair Display",
           anime: "Montserrat",
           soviet: "Russo One",
           fairytale: "Ruslan Display",
-          cartoon: "Neucha",
-          fantasy: "Ruslan Display",
+          cartoon: "Nunito",
+          fantasy: "Cinzel Decorative",
           normal: "Russo One",
         };
         if (themeDefaultFont[newSettings.theme]) {
