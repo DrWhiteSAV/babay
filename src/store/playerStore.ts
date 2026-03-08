@@ -158,7 +158,7 @@ export interface PlayerState {
 
 export const DEFAULT_SETTINGS = {
   buttonSize: "small" as ButtonSize,
-  fontFamily: "JetBrains Mono" as FontFamily,
+  fontFamily: "Russo One" as FontFamily,
   fontSize: 12,
   fontBrightness: 100,
   theme: "normal" as Theme,
