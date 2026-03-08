@@ -40,7 +40,7 @@ type FilterMode = "all" | "friends" | "groups";
 
 export default function Chats() {
   const navigate = useNavigate();
-  const { character, friends, groupChats, updateGroupName, deleteGroupChat, createGroupChat } = usePlayerStore();
+  const { character, friends, groupChats, updateGroupName, deleteGroupChat, createGroupChat, toggleFriendAi } = usePlayerStore();
   const { profile } = useTelegram();
 
   const [search, setSearch] = useState("");

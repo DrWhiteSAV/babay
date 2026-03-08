@@ -71,6 +71,7 @@ export default function Friends() {
   const [energyModal, setEnergyModal] = useState<{ friendName: string; telegramId?: number } | null>(null);
   const [energyAmount, setEnergyAmount] = useState(10);
   const [energySending, setEnergySending] = useState(false);
+  const [friendSearch, setFriendSearch] = useState("");
 
   // Collect all friend telegram IDs for online status polling
   const friendTelegramIds = useMemo(
