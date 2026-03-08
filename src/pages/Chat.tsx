@@ -904,6 +904,19 @@ export default function Chat() {
                       </div>
                     )}
 
+                    {/* PVP Invite Button */}
+                    {msg.pvpRoomId && (
+                      <div className="mb-2">
+                        <button
+                          onClick={() => navigate(`/pvp/room/${msg.pvpRoomId}?join=1`)}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 active:scale-[0.97] rounded-xl font-black text-sm uppercase tracking-wide transition-all shadow-[0_0_14px_rgba(220,38,38,0.4)] w-full justify-center"
+                        >
+                          <Swords size={16} />
+                          Войти в комнату PVP
+                        </button>
+                      </div>
+                    )}
+
                     {/* Image */}
                     {msg.imageUrl && (
                       <div className="mb-2">
