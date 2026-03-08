@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
 import { Image as ImageIcon, X, Download, Loader2, ExternalLink, User, Mountain, Skull } from "lucide-react";
