@@ -197,6 +197,8 @@ body {
 .theme-horror {
   background-color: #080508 !important;
   color: #d4a0a0 !important;
+  /* Special Elite — чёткий, зловещий стиль печатной машинки */
+  font-family: "Special Elite", cursive !important;
 }
 .theme-horror [class*="bg-neutral-900"],
 .theme-horror [class*="bg-neutral-950"],
@@ -213,8 +215,9 @@ body {
 .theme-horror .text-white,
 .theme-horror .text-neutral-200,
 .theme-horror .text-neutral-300 {
-  color: #e8c8c8 !important;
-  text-shadow: 0 0 8px rgba(200, 0, 0, 0.3);
+  color: #f0d8d8 !important;
+  text-shadow: 0 0 6px rgba(200, 0, 0, 0.25);
+  font-family: "Special Elite", cursive !important;
 }
 .theme-horror .text-red-500,
 .theme-horror .text-red-400 {
@@ -225,6 +228,10 @@ body {
   background-color: #8b0000 !important;
   border-color: #cc0000 !important;
   box-shadow: 0 0 20px rgba(200, 0, 0, 0.5) !important;
+  font-family: "Special Elite", cursive !important;
+}
+.theme-horror button:not(.cutscene-skip-btn) {
+  font-family: "Special Elite", cursive !important;
 }
 .theme-horror button:not(.cutscene-skip-btn):hover {
   background-color: rgba(180, 0, 0, 0.2) !important;
