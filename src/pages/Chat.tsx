@@ -52,6 +52,7 @@ interface Message {
   sender_telegram_id?: number;
   read_at?: string | null;
   created_at?: string;
+  isAiGenerated?: boolean;
 }
 
 interface PendingRetry {
@@ -95,6 +96,9 @@ export default function Chat() {
   const aiIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const aiResolvedRef = useRef(false);
   const lastAutoRespondedIdRef = useRef<string | null>(null);
+
+  const [aiSubCountdown, setAiSubCountdown] = useState(0);
+  const aiSubIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -249,32 +253,53 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
-  // ── AI-Substitute: auto-respond to incoming real-user messages ──────────────
-  // When isAiSubstitute is ON and a new message arrives from the other real user,
-  // automatically generate and send an AI reply on the current user's behalf.
+  // ── AI-Substitute: 30s countdown then auto-respond ──────────────────────────
   useEffect(() => {
-    if (!isAiSubstitute) return;
+    if (!isAiSubstitute) {
+      if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+      setAiSubCountdown(0);
+      return;
+    }
     if (!friend || !character || !chatKey) return;
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
-    // Only react to incoming messages from the real friend (not AI, not self)
-    if (!lastMsg.sender_telegram_id) return; // AI message — skip
-    if (lastMsg.sender_telegram_id === profile?.telegram_id) return; // own message — skip
-    if (lastMsg.id === lastAutoRespondedIdRef.current) return; // already responded
+    if (!lastMsg.sender_telegram_id) return;
+    if (lastMsg.sender_telegram_id === profile?.telegram_id) return;
+    if (lastMsg.id === lastAutoRespondedIdRef.current) return;
 
-    lastAutoRespondedIdRef.current = lastMsg.id;
+    // Clear any previous countdown
+    if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
 
-    const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-    doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages);
-  }, [messages.length, isAiSubstitute, friend, character, chatKey, profile?.telegram_id]);
+    const targetMsgId = lastMsg.id;
+    let remaining = 30;
+    setAiSubCountdown(remaining);
+
+    aiSubIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      setAiSubCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(aiSubIntervalRef.current!);
+        setAiSubCountdown(0);
+        if (lastAutoRespondedIdRef.current !== targetMsgId) {
+          lastAutoRespondedIdRef.current = targetMsgId;
+          const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+          doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
+        }
+      }
+    }, 1000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, isAiSubstitute, friend?.name, character?.name, chatKey, profile?.telegram_id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
-    return () => { if (aiIntervalRef.current) clearInterval(aiIntervalRef.current); };
+    return () => {
+      if (aiIntervalRef.current) clearInterval(aiIntervalRef.current);
+      if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
+    };
   }, []);
 
   const startAiCountdown = useCallback(() => {
@@ -303,22 +328,22 @@ export default function Chat() {
     setAiCountdown(0);
   }, []);
 
-  const saveMessageToDB = async (msg: Message, role: string, senderName: string) => {
-    if (!chatKey) return;
+  const saveMessageToDB = async (msg: Message, role: string, senderName: string): Promise<string | null> => {
+    if (!chatKey) return null;
     // Encode imageUrl into content using [img]: prefix so it persists in DB
     let content = msg.text || '';
     if (msg.imageUrl) content = `[img]:${msg.imageUrl}\n${content}`;
-    await supabase.from("chat_messages").insert({
+    const { data: inserted } = await supabase.from("chat_messages").insert({
       telegram_id: profile?.telegram_id || 0,
       content,
       role,
       friend_name: senderName,
       chat_key: chatKey,
       sender_telegram_id: role === 'user' ? profile?.telegram_id : null,
-    } as any);
+    } as any).select('id').single();
 
     // Notify recipient via Telegram if they're offline (only for user-sent messages)
-    if (role !== 'user') return;
+    if (role !== 'user') return inserted?.id || null;
     const myName = character?.name || senderName;
     const previewText = msg.imageUrl ? "📷 Фото" : (msg.text || "").slice(0, 100);
 
@@ -331,14 +356,10 @@ export default function Chat() {
         );
       }
     } else if (group) {
-      // For group chats: notify all real (non-AI) members that are offline
-      // Check if message is a @mention or a reply
       const isMention = (name: string) => msg.text?.includes(`@${name}`);
       const isReply = !!msg.replyTo;
-
-      // Fetch telegram_ids of group members
       const memberNames = group.members.filter(m => m !== "ДанИИл" && m !== character?.name);
-      if (memberNames.length === 0) return;
+      if (memberNames.length === 0) return inserted?.id || null;
       const { data: memberStats } = await supabase
         .from("player_stats")
         .select("telegram_id, character_name")
@@ -357,6 +378,7 @@ export default function Chat() {
         }
       }
     }
+    return inserted?.id || null;
   };
 
   const doAiReply = useCallback(async (
@@ -366,6 +388,7 @@ export default function Chat() {
     responder: string,
     recentMessages: { sender: string; text: string }[],
     isRetry = false,
+    isSubstituteCall = false,
   ) => {
     setIsAiTyping(true);
     setAiTimedOut(false);
@@ -385,9 +408,14 @@ export default function Chat() {
         setPendingRetry({ userMessage, imageToSend, replyToMsgId, responder, recentMessages });
         return;
       }
-      const aiMsg: Message = { id: Date.now().toString(), sender: responder, text: responseText, replyTo: replyToMsgId || undefined };
+      const tempId = `pending_ai_${Date.now()}`;
+      const aiMsg: Message = { id: tempId, sender: responder, text: responseText, replyTo: replyToMsgId || undefined, isAiGenerated: isSubstituteCall };
       setMessages(prev => [...prev, aiMsg]);
-      await saveMessageToDB(aiMsg, 'assistant', responder);
+      const dbId = await saveMessageToDB(aiMsg, 'assistant', responder);
+      // Replace temp ID with real DB UUID to prevent realtime duplication
+      if (dbId) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
+      }
       setPendingRetry(null);
     } catch (e) {
       stopAiCountdown();
@@ -436,18 +464,24 @@ export default function Chat() {
     const userMessage = input.trim();
     const imageToSend = selectedImage;
     const currentReplyTo = replyToMsg?.id;
-    const newMsg: Message = { id: Date.now().toString(), sender: "user", text: userMessage, imageUrl: imageToSend || undefined, replyTo: currentReplyTo };
+    const tempId = `pending_user_${Date.now()}`;
+    const newMsg: Message = { id: tempId, sender: "user", text: userMessage, imageUrl: imageToSend || undefined, replyTo: currentReplyTo };
     setMessages(prev => [...prev, newMsg]);
     setInput("");
     setSelectedImage(null);
     setReplyToMsg(null);
     setShowMentions(false);
-    await saveMessageToDB(newMsg, 'user', character?.name || 'user');
+    // Save to DB and swap temp ID with real UUID to prevent realtime duplication
+    const dbId = await saveMessageToDB(newMsg, 'user', character?.name || 'user');
+    if (dbId) {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: dbId } : m));
+    }
     const shouldUseAI = friend?.isAiEnabled && (!friendTelegramId || !isFriendOnline);
     if (shouldUseAI) {
       const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-      setPendingRetry({ userMessage, imageToSend, replyToMsgId: newMsg.id, responder: friend!.name, recentMessages });
-      await doAiReply(userMessage, imageToSend, newMsg.id, friend!.name, recentMessages);
+      const realMsgId = dbId || tempId;
+      setPendingRetry({ userMessage, imageToSend, replyToMsgId: realMsgId, responder: friend!.name, recentMessages });
+      await doAiReply(userMessage, imageToSend, realMsgId, friend!.name, recentMessages);
     } else if (group) {
       const aiMembers = group.members.filter(m => friends.find(f => f.name === m)?.isAiEnabled);
       const mentionedAIs = aiMembers.filter(m => userMessage.includes(`@${m}`));
@@ -461,9 +495,10 @@ export default function Chat() {
       }
       if (responders.length > 0) {
         const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
-        setPendingRetry({ userMessage, imageToSend, replyToMsgId: newMsg.id, responder: responders[0], recentMessages });
+        const realMsgId = dbId || tempId;
+        setPendingRetry({ userMessage, imageToSend, replyToMsgId: realMsgId, responder: responders[0], recentMessages });
         for (const responder of responders) {
-          await doAiReply(userMessage, imageToSend, newMsg.id, responder, recentMessages);
+          await doAiReply(userMessage, imageToSend, realMsgId, responder, recentMessages);
         }
       }
     }
@@ -605,6 +640,14 @@ export default function Chat() {
                     className="text-[10px] text-neutral-400 mb-1 ml-1 cursor-pointer hover:text-white transition-colors"
                     onClick={() => setShowProfilePopup({ name: msg.sender, telegramId: msg.sender_telegram_id ?? undefined })}
                   >{msg.sender}</span>
+                )}
+
+                {/* AI-generated badge */}
+                {msg.isAiGenerated && (
+                  <div className={`flex items-center gap-1 mb-1 ${isUser ? "mr-1" : "ml-1"}`}>
+                    <Bot size={10} className="text-green-400" />
+                    <span className="text-[9px] text-green-400 font-semibold tracking-wide">ИИ-заместитель</span>
+                  </div>
                 )}
 
                 <div className="flex items-end gap-1.5 group/msg">
@@ -775,9 +818,16 @@ export default function Chat() {
                 style={{ background: "linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.12))", border: "1px solid rgba(34,197,94,0.3)" }}
               >
                 <Bot size={15} className="text-green-400 shrink-0" />
-                <span className="text-xs text-green-300 flex-1">ИИ-заместитель пишет за тебя</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-green-300 block">ИИ-заместитель пишет за тебя</span>
+                  {aiSubCountdown > 0 && (
+                    <span className="text-[10px] text-green-500 font-mono">
+                      Ответит через <span className="text-green-300 font-bold">{aiSubCountdown}с</span>
+                    </span>
+                  )}
+                </div>
                 <button
-                  onClick={() => { setIsAiSubstitute(false); setMyAiDraft(""); setInput(""); }}
+                  onClick={() => { setIsAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); }}
                   className="text-green-400 hover:text-white text-xs font-bold shrink-0"
                 >Выкл</button>
               </motion.div>
