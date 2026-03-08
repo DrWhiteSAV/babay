@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePlayerStore } from "../store/playerStore";
 import { motion, AnimatePresence } from "motion/react";
 import { Image as ImageIcon, X, Download, Loader2, ExternalLink, User, Mountain, Skull } from "lucide-react";
@@ -25,33 +25,55 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<Section>("all");
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const tgId = profile?.telegram_id;
-      if (tgId) {
-        const { data, error } = await supabase
-          .from("gallery")
-          .select("id, image_url, label, created_at")
-          .eq("telegram_id", tgId)
-          .order("created_at", { ascending: false });
-        if (error) console.error("[Gallery] load error:", error);
-        if (data) {
-          console.log("[Gallery] loaded items:", data.length, data.map(d => d.label));
-          setItems(data);
-        }
-      }
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const isRenderableImageUrl = (url: string | null | undefined) =>
+    typeof url === "string" && /^https?:\/\//i.test(url.trim());
+
+  const loadGallery = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+
+    const tgId = profile?.telegram_id;
+    if (!tgId) {
+      setItems([]);
       setLoading(false);
-    };
-    load();
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("gallery")
+      .select("id, image_url, label, created_at")
+      .eq("telegram_id", tgId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[Gallery] load error:", error);
+      setLoadError("Не удалось загрузить галерею из базы данных");
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    const normalized = (data || [])
+      .filter((row) => isRenderableImageUrl(row.image_url))
+      .map((row) => ({ ...row, image_url: row.image_url.trim() }));
+
+    setItems(normalized);
+    usePlayerStore.setState({ gallery: normalized.map((item) => item.image_url) });
+    setLoading(false);
   }, [profile?.telegram_id]);
+
+  useEffect(() => {
+    loadGallery();
+  }, [loadGallery]);
 
   const getCategory = (item: GalleryItem): Section => {
     const label = (item.label || "").toLowerCase();
-    if (label.includes("[avatars]") || label.includes("аватар")) return "avatars";
-    if (label.includes("[backgrounds]") || label.includes("фон")) return "backgrounds";
-    if (label.includes("[bosses]") || label.includes("босс")) return "bosses";
-    return "avatars"; // Default uncategorized items to avatars (most likely case)
+    if (label.includes("[avatars]") || label.includes("[avatar]") || label.includes("аватар")) return "avatars";
+    if (label.includes("[backgrounds]") || label.includes("[background]") || label.includes("фон")) return "backgrounds";
+    if (label.includes("[bosses]") || label.includes("[boss]") || label.includes("босс")) return "bosses";
+    return "avatars";
   };
 
   const filteredItems = activeSection === "all"
@@ -95,19 +117,7 @@ export default function Gallery() {
         backUrl="/profile"
         rightContent={
           <button
-            onClick={async () => {
-              setLoading(true);
-              const tgId = profile?.telegram_id;
-              if (tgId) {
-                const { data } = await supabase
-                  .from("gallery")
-                  .select("id, image_url, label, created_at")
-                  .eq("telegram_id", tgId)
-                  .order("created_at", { ascending: false });
-                if (data) setItems(data);
-              }
-              setLoading(false);
-            }}
+            onClick={loadGallery}
             className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-full font-bold transition-colors"
           >
             🔄 Обновить
@@ -140,6 +150,17 @@ export default function Gallery() {
           <div className="flex items-center justify-center h-full">
             <Loader2 size={32} className="animate-spin text-red-500" />
           </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center h-full text-neutral-500 text-center px-6">
+            <ImageIcon size={48} className="mb-4 opacity-50" />
+            <p>{loadError}</p>
+            <button
+              onClick={loadGallery}
+              className="mt-4 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-sm"
+            >
+              Повторить
+            </button>
+          </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-neutral-500">
             <ImageIcon size={48} className="mb-4 opacity-50" />
@@ -171,13 +192,14 @@ export default function Gallery() {
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   loading="lazy"
                   referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "https://i.ibb.co/BVgY7XrT/babai.png";
                   }}
                 />
                 {item.label && (
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[10px] text-neutral-300 px-2 py-1 truncate">
-                    {item.label.replace(/^\[(avatars|backgrounds|bosses)\]\s*/i, "")}
+                    {item.label.replace(/^\[(avatars|avatar|backgrounds|background|bosses|boss)\]\s*/i, "")}
                   </div>
                 )}
                 <div className="absolute top-2 left-2">

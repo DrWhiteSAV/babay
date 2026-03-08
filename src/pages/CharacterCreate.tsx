@@ -17,7 +17,7 @@ const STYLES: Style[] = [
 ];
 
 const WISHES_OPTIONS = [
-  "Длинные когти", "Светящиеся глаза", "Рваная пижама", "Огромные зубы",
+  "Длинные когти", "Светящиеся глаза", "Треснувшие рога", "Огромные зубы",
   "Лысина", "Борода до колен", "Много глаз", "Щупальца вместо рук",
 ];
 
@@ -50,7 +50,7 @@ async function callProtalk(
 
 export default function CharacterCreate() {
   const navigate = useNavigate();
-  const { setCharacter, updateCharacter, addFear, addEnergy } = usePlayerStore();
+  const { setCharacter, addFear, addEnergy } = usePlayerStore();
   const { profile } = useTelegram();
 
   const [gender, setGender] = useState<Gender | null>(null);
@@ -111,7 +111,7 @@ export default function CharacterCreate() {
     setIsGeneratingName(true);
     try {
       const genderDesc = g === "Бабай" ? "мужской" : "женский";
-      const prompt = `Придумай одно уникальное, жутковатое и немного абсурдное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Например: "Дзяка Мокрая", "Журон Подвальный", "Хрыпач Чердачный", "Кряхта Ржавая". Для ${genderDesc} рода используй соответствующее окончание прилагательного. Запрещены слова: "Пижама", "Бабай", "Дух", "Пижамовий", "Пижамный". Верни ТОЛЬКО имя (2 слова), без пояснений, кавычек, нумерации.`;
+      const prompt = `Придумай одно уникальное, жутковатое и немного абсурдное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Например: "Дзяка Мокрая", "Журон Подвальный", "Хрыпач Чердачный", "Кряхта Ржавая". Для ${genderDesc} рода используй соответствующее окончание прилагательного. Запрещены слова: "Бабай", "Дух", "Леший". Верни ТОЛЬКО имя (2 слова), без пояснений, кавычек, нумерации.`;
       const data = await callProtalk("text", prompt, tgId);
       const raw = data.text || "";
       const cleaned = raw.split("\n")[0]
@@ -119,14 +119,14 @@ export default function CharacterCreate() {
         .replace(/^[-*•]\s*/, "")
         .replace(/["""«»]/g, "")
         .trim();
-      const baseName = cleaned || (g === "Бабай" ? "Бурьяник" : "Тьмарица");
+      const baseName = cleaned && !/пижам/i.test(cleaned) ? cleaned : (g === "Бабай" ? "Бурьяник Лунный" : "Тьмарица Сырая");
       const { finalName, isDuplicate } = await ensureUniqueName(baseName);
       setGeneratedName(finalName);
       setNameHasDuplicate(isDuplicate);
       setNameLocked(true); // Lock after first generation
     } catch (e) {
       console.error("[Create] name gen error:", e);
-      setGeneratedName(g === "Бабай" ? "Бурьяник" : "Тьмарица");
+      setGeneratedName(g === "Бабай" ? "Бурьяник Лунный" : "Тьмарица Сырая");
       setNameLocked(true);
     } finally {
       setIsGeneratingName(false);
@@ -139,7 +139,7 @@ export default function CharacterCreate() {
     setIsGeneratingName(true);
     try {
       const genderDesc = gender === "Бабай" ? "мужской" : "женский";
-      const prompt = `Придумай одно уникальное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Для ${genderDesc} рода используй правильное окончание. Запрещены слова: "Пижама", "Бабай", "Дух". Верни ТОЛЬКО имя (2 слова).`;
+      const prompt = `Придумай одно уникальное имя для славянского духа. Пол: ${genderDesc}. Формат: необычное имя + прилагательное. Для ${genderDesc} рода используй правильное окончание. Запрещены слова: "Бабай", "Дух", "Леший". Верни ТОЛЬКО имя (2 слова).`;
       const data = await callProtalk("text", prompt, tgId);
       const raw = data.text || "";
       const cleaned = raw.split("\n")[0]
@@ -238,12 +238,61 @@ export default function CharacterCreate() {
     const name = generatedName || "Безымянный";
     const finalUrl = selectedDefaultImage || generatedAvatarUrl || FALLBACK_AVATAR;
 
-    setCharacter({ name, gender, style, wishes, avatarUrl: finalUrl, telekinesisLevel: 1 });
-    if (generatedLore) updateCharacter({ lore: generatedLore });
+    setCharacter({
+      name,
+      gender,
+      style,
+      wishes,
+      avatarUrl: finalUrl,
+      telekinesisLevel: 1,
+      lore: generatedLore || undefined,
+    });
 
-    // Persist lore
-    if (tgId && generatedLore) {
-      supabase.from("player_stats").update({ lore: generatedLore }).eq("telegram_id", tgId).then();
+    if (tgId) {
+      try {
+        const storeState = usePlayerStore.getState();
+        const { data: existingStats } = await supabase
+          .from("player_stats")
+          .select("custom_settings")
+          .eq("telegram_id", tgId)
+          .maybeSingle();
+
+        const existingCustomSettings =
+          existingStats?.custom_settings && typeof existingStats.custom_settings === "object"
+            ? (existingStats.custom_settings as Record<string, unknown>)
+            : {};
+
+        await supabase.from("player_stats").upsert(
+          {
+            telegram_id: tgId,
+            fear: storeState.fear,
+            energy: storeState.energy,
+            watermelons: storeState.watermelons,
+            boss_level: storeState.bossLevel,
+            telekinesis_level: 1,
+            character_name: name,
+            character_gender: gender,
+            character_style: style,
+            avatar_url: finalUrl,
+            lore: generatedLore || null,
+            custom_settings: {
+              ...existingCustomSettings,
+              buttonSize: storeState.settings.buttonSize,
+              fontFamily: storeState.settings.fontFamily,
+              fontSize: storeState.settings.fontSize,
+              fontBrightness: storeState.settings.fontBrightness,
+              theme: storeState.settings.theme,
+              musicVolume: storeState.settings.musicVolume,
+              ttsEnabled: storeState.settings.ttsEnabled,
+              wishes,
+              inventory: storeState.inventory,
+            },
+          },
+          { onConflict: "telegram_id" }
+        );
+      } catch (e) {
+        console.error("[Create] initial save error:", e);
+      }
     }
 
     // Referral bonus
