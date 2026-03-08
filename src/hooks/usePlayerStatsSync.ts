@@ -323,6 +323,7 @@ export function usePlayerStatsSync() {
 function buildGameplaySnapshot(store: ReturnType<typeof usePlayerStore.getState>): string {
   return JSON.stringify({
     fear: store.fear,
+    energy: store.energy,
     watermelons: store.watermelons,
     boss_level: store.bossLevel,
     telekinesis_level: store.character?.telekinesisLevel ?? 1,
