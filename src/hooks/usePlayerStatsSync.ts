@@ -210,6 +210,8 @@ export function usePlayerStatsSync() {
     return () => { cancelled = true; };
   }, [profile?.telegram_id]);
 
+  const store = usePlayerStore();
+
   // ─── AUTO-SYNC settings TO DB (debounced 800ms, fires from anywhere in the app) ──
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsLoadedRef = useRef(false);
