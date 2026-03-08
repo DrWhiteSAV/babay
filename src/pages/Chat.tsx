@@ -818,9 +818,16 @@ export default function Chat() {
                 style={{ background: "linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.12))", border: "1px solid rgba(34,197,94,0.3)" }}
               >
                 <Bot size={15} className="text-green-400 shrink-0" />
-                <span className="text-xs text-green-300 flex-1">ИИ-заместитель пишет за тебя</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-green-300 block">ИИ-заместитель пишет за тебя</span>
+                  {aiSubCountdown > 0 && (
+                    <span className="text-[10px] text-green-500 font-mono">
+                      Ответит через <span className="text-green-300 font-bold">{aiSubCountdown}с</span>
+                    </span>
+                  )}
+                </div>
                 <button
-                  onClick={() => { setIsAiSubstitute(false); setMyAiDraft(""); setInput(""); }}
+                  onClick={() => { setIsAiSubstitute(false); setMyAiDraft(""); setInput(""); if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current); setAiSubCountdown(0); }}
                   className="text-green-400 hover:text-white text-xs font-bold shrink-0"
                 >Выкл</button>
               </motion.div>
