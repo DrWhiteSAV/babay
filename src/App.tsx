@@ -243,6 +243,7 @@ function AppContent() {
         <BottomNav />
       </div>
     </div>
+    </>
   );
 }
 
