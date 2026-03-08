@@ -275,6 +275,47 @@ export default function Chat() {
       chat_key: chatKey,
       sender_telegram_id: role === 'user' ? profile?.telegram_id : null,
     } as any);
+
+    // Notify recipient via Telegram if they're offline (only for user-sent messages)
+    if (role !== 'user') return;
+    const myName = character?.name || senderName;
+    const previewText = msg.imageUrl ? "📷 Фото" : (msg.text || "").slice(0, 100);
+
+    if (friend && friendTelegramId) {
+      const online = await isUserOnline(friendTelegramId);
+      if (!online) {
+        await sendTelegramNotification(
+          friendTelegramId,
+          `💬 *Новое сообщение от ${myName}*\n\n${previewText}`
+        );
+      }
+    } else if (group) {
+      // For group chats: notify all real (non-AI) members that are offline
+      // Check if message is a @mention or a reply
+      const isMention = (name: string) => msg.text?.includes(`@${name}`);
+      const isReply = !!msg.replyTo;
+
+      // Fetch telegram_ids of group members
+      const memberNames = group.members.filter(m => m !== "ДанИИл" && m !== character?.name);
+      if (memberNames.length === 0) return;
+      const { data: memberStats } = await supabase
+        .from("player_stats")
+        .select("telegram_id, character_name")
+        .in("character_name", memberNames);
+
+      for (const member of (memberStats || [])) {
+        if (!member.telegram_id) continue;
+        const shouldNotify = isMention(member.character_name || "") || isReply;
+        if (!shouldNotify) continue;
+        const online = await isUserOnline(member.telegram_id);
+        if (!online) {
+          await sendTelegramNotification(
+            member.telegram_id,
+            `💬 *${myName}* упомянул тебя в группе *${group.name}*\n\n${previewText}`
+          );
+        }
+      }
+    }
   };
 
   const doAiReply = useCallback(async (
