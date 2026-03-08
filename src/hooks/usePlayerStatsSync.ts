@@ -211,6 +211,8 @@ export function usePlayerStatsSync() {
         // This ensures the sync-to-DB effect only fires AFTER the store has fresh DB data
         updates.dbLoaded = true;
         usePlayerStore.setState(updates);
+        // Record when DB load finished — used to block premature writes
+        dbLoadedAtRef.current = Date.now();
 
         console.log("[usePlayerStatsSync] Loaded from DB:", {
           character: updates.character?.name,
