@@ -297,9 +297,18 @@ export function usePlayerStatsSync() {
       return;
     }
 
-    // Something changed — update snapshot and write to DB
+    // Something changed — log diff and write to DB
     dbSnapshotRef.current = currentSnapshot;
-    console.log("[usePlayerStatsSync] State changed — writing to DB for", store.character.name);
+
+    // Debug: log which fields actually changed vs old snapshot
+    try {
+      const prev = JSON.parse(dbSnapshotRef.current || "{}");
+      const curr = syncData as Record<string, unknown>;
+      const changed = Object.keys(curr).filter(k => JSON.stringify(prev[k]) !== JSON.stringify(curr[k]));
+      console.log("[usePlayerStatsSync] State changed — writing to DB for", store.character.name, "| changed fields:", changed);
+    } catch {
+      console.log("[usePlayerStatsSync] State changed — writing to DB for", store.character.name);
+    }
 
     const timer = setTimeout(async () => {
       const { error } = await supabase
@@ -333,7 +342,8 @@ export function usePlayerStatsSync() {
     store.character?.style,
     store.character?.avatarUrl,
     store.character?.lore,
-    store.character?.wishes,
+    // ← FIX: wishes — массив, нестабильная ссылка. Используем стабильную строку вместо ссылки на массив
+    store.character?.wishes?.join(","),
     store.settings.buttonSize,
     store.settings.fontFamily,
     store.settings.fontSize,
@@ -341,7 +351,8 @@ export function usePlayerStatsSync() {
     store.settings.theme,
     store.settings.musicVolume,
     store.settings.ttsEnabled,
-    store.inventory,
-    store.gameStatus,
+    // ← FIX: inventory — массив, нестабильная ссылка. Используем стабильную строку
+    store.inventory?.join(","),
+    // ← FIX: gameStatus убран из deps — Gate #3 уже проверяет внутри эффекта
   ]);
 }
