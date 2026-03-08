@@ -267,7 +267,7 @@ export default function Chat() {
     }
   }, [messages.length, chatKey, profile?.telegram_id]);
 
-  // ── AI-Substitute: 30s countdown then auto-respond ──────────────────────────
+  // ── AI-Substitute: 30s countdown then reply AS ME when friend sends a message ──
   useEffect(() => {
     if (!isAiSubstitute) {
       if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
@@ -278,9 +278,12 @@ export default function Chat() {
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
-    if (!lastMsg.sender_telegram_id) return;
-    if (lastMsg.sender_telegram_id === profile?.telegram_id) return;
+    // Only trigger when the last message is from the OTHER person (friend), not from me
+    const lastMsgFromFriend = lastMsg.sender !== 'user' && lastMsg.sender_telegram_id !== profile?.telegram_id;
+    if (!lastMsgFromFriend) return;
     if (lastMsg.id === lastAutoRespondedIdRef.current) return;
+    // Don't trigger if this is a pending_ (optimistic) message
+    if (lastMsg.id.startsWith('pending_')) return;
 
     // Clear any previous countdown
     if (aiSubIntervalRef.current) clearInterval(aiSubIntervalRef.current);
@@ -298,6 +301,7 @@ export default function Chat() {
         if (lastAutoRespondedIdRef.current !== targetMsgId) {
           lastAutoRespondedIdRef.current = targetMsgId;
           const recentMessages = messages.slice(-10).map(m => ({ sender: m.sender, text: m.text }));
+          // Reply AS ME to the friend's message
           doAiReply(lastMsg.text, null, lastMsg.id, character.name, recentMessages, false, true);
         }
       }
