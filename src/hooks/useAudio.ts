@@ -3,11 +3,11 @@ import { useLocation } from "react-router-dom";
 
 // Stable direct links for background music
 export const bgMusics = [
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+  "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/babai3.mp3",
+  "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/babai6.mp3",
+  "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/babai9.mp3",
+  "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/babai11.mp3",
+  "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/babai12.mp3",
 ];
 
 export const menuMusic = "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Babaisong.mp3";
