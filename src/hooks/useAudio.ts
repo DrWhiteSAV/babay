@@ -1,16 +1,16 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useRef, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 
 // Stable direct links for background music
 export const bgMusics = [
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3'
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
 ];
 
-export const menuMusic = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3';
+export const menuMusic = "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Babaisong.mp3";
 
 export const useAudio = (volume: number) => {
   const location = useLocation();
@@ -19,7 +19,7 @@ export const useAudio = (volume: number) => {
   const timeoutRefs = useRef<number[]>([]);
 
   const clearTimers = () => {
-    timeoutRefs.current.forEach(timer => clearTimeout(timer));
+    timeoutRefs.current.forEach((timer) => clearTimeout(timer));
     timeoutRefs.current = [];
   };
 
@@ -28,20 +28,20 @@ export const useAudio = (volume: number) => {
     if (lastPathRef.current !== location.pathname) {
       clearTimers();
 
-      const pathSounds: Record<string, 'scream' | 'cat' | 'fear'> = {
-        '/game': 'scream',
-        '/hub': 'cat',
-        '/profile': 'fear',
-        '/shop': 'fear',
-        '/settings': 'cat',
-        '/friends': 'cat',
-        '/chat': 'fear',
-        '/gallery': 'cat',
-        '/create': 'scream'
+      const pathSounds: Record<string, "scream" | "cat" | "fear"> = {
+        "/game": "scream",
+        "/hub": "cat",
+        "/profile": "fear",
+        "/shop": "fear",
+        "/settings": "cat",
+        "/friends": "cat",
+        "/chat": "fear",
+        "/gallery": "cat",
+        "/create": "scream",
       };
-      
-      const specialSound = pathSounds[location.pathname] || 'fear';
-      
+
+      const specialSound = pathSounds[location.pathname] || "fear";
+
       const t1 = window.setTimeout(() => {
         playTransition();
         const t2 = window.setTimeout(() => {
@@ -49,7 +49,7 @@ export const useAudio = (volume: number) => {
         }, 400);
         timeoutRefs.current.push(t2);
       }, 150);
-      
+
       timeoutRefs.current.push(t1);
       lastPathRef.current = location.pathname;
     }
@@ -70,7 +70,7 @@ export const useAudio = (volume: number) => {
   const playClick = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
     if (!hasInteracted) return;
-    const click = new Audio('https://www.soundjay.com/buttons/button-16.mp3');
+    const click = new Audio("https://www.soundjay.com/buttons/button-16.mp3");
     click.volume = volume / 100;
     click.play().catch(() => {});
   }, [volume]);
@@ -78,29 +78,33 @@ export const useAudio = (volume: number) => {
   const playTransition = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
     if (!hasInteracted) return;
-    const whoosh = new Audio('https://www.soundjay.com/free-music/whoosh-01.mp3');
+    const whoosh = new Audio("https://www.soundjay.com/free-music/whoosh-01.mp3");
     whoosh.volume = volume / 100;
     whoosh.play().catch(() => {});
   }, [volume]);
 
-  const playSound = useCallback((type: 'scream' | 'cat' | 'fear') => {
-    const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
-    if (!hasInteracted) return;
-    if (specialAudioRef.current) {
-      specialAudioRef.current.pause();
-    }
+  const playSound = useCallback(
+    (type: "scream" | "cat" | "fear") => {
+      const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
+      if (!hasInteracted) return;
+      if (specialAudioRef.current) {
+        specialAudioRef.current.pause();
+      }
 
-    const src = type === 'scream' 
-      ? 'https://www.soundjay.com/human/man-scream-01.mp3'
-      : type === 'cat'
-      ? 'https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3'
-      : 'https://www.soundjay.com/human/heartbeat-01.mp3';
-    
-    const audio = new Audio(src);
-    audio.volume = (volume / 100) * 0.5;
-    specialAudioRef.current = audio;
-    audio.play().catch(() => {});
-  }, [volume]);
+      const src =
+        type === "scream"
+          ? "https://www.soundjay.com/human/man-scream-01.mp3"
+          : type === "cat"
+            ? "https://www.soundjay.com/mechanical/camera-shutter-click-01.mp3"
+            : "https://www.soundjay.com/human/heartbeat-01.mp3";
+
+      const audio = new Audio(src);
+      audio.volume = (volume / 100) * 0.5;
+      specialAudioRef.current = audio;
+      audio.play().catch(() => {});
+    },
+    [volume],
+  );
 
   return { playClick, playTransition, playSound };
 };
