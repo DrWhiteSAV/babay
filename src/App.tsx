@@ -213,7 +213,12 @@ function AppContent() {
     settings.buttonSize === "large" ? "btn-large" : "btn-medium";
 
   const currentPath = location.pathname;
-  const customBg = pageBackgrounds?.[currentPath];
+  const bgEntries = pageBackgrounds?.[currentPath];
+  // Pick a random background from available entries (stable per page load via useMemo)
+  const [randomBgIndex] = useState(() => Math.random());
+  const customBg = bgEntries && bgEntries.length > 0
+    ? bgEntries[Math.floor(randomBgIndex * bgEntries.length)]
+    : null;
   const activeBgUrl = customBg?.url || globalBackgroundUrl;
 
   // Calculate dimming values based on customBg.dimming (0-100)
