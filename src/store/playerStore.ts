@@ -122,7 +122,7 @@ export interface PlayerState {
     ttsEnabled: boolean;
   };
   globalBackgroundUrl: string | null;
-  pageBackgrounds: Record<string, { url: string; dimming: number }>;
+  pageBackgrounds: Record<string, Array<{ url: string; dimming: number }>>;
   videoCutscenes: {
     vertical: string[];
     horizontal: string[];
