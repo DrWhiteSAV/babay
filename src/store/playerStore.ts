@@ -261,8 +261,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       return { settings: updated };
     }),
   setGlobalBackgroundUrl: (url) => set({ globalBackgroundUrl: url }),
-  setPageBackground: (page, url, dimming) => set((state) => ({
-    pageBackgrounds: { ...state.pageBackgrounds, [page]: { url, dimming } }
+  setPageBackgrounds: (page, entries) => set((state) => ({
+    pageBackgrounds: { ...state.pageBackgrounds, [page]: entries }
   })),
   setVideoCutscenes: (vertical, horizontal) => set({ videoCutscenes: { vertical, horizontal } }),
   updateStoreConfig: (config) => set((state) => ({ storeConfig: { ...state.storeConfig, ...config } })),
