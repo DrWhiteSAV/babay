@@ -794,9 +794,12 @@ export default function Game() {
     };
   };
 
-  // ======== SCREENS ========
+  // ======== DEMO WALL ========
+  if (showDemoWall) {
+    return <DemoWall showCutscene />;
+  }
 
-  if (isGameOver) {
+  // ======== SCREENS ========
     // PVP room mode → show loading while DB write + redirect happen in useEffect
     if (pvpRoomId) {
       return (
