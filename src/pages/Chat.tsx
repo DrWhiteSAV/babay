@@ -816,7 +816,7 @@ export default function Chat() {
             )}
           </div>
         }
-        backUrl="/friends"
+        backUrl="/chats"
       />
 
       {/* Messages */}

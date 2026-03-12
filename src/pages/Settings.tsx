@@ -458,7 +458,8 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* TTS Toggle */}
+        {/* TTS Toggle - visible only for Супер-Бабай */}
+        {profile?.role === "Супер-Бабай" && (
         <section>
           <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-2">
             {settings.ttsEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />} Озвучка текста
@@ -470,6 +471,7 @@ export default function Settings() {
             {settings.ttsEnabled ? "ВКЛЮЧЕНА" : "ВЫКЛЮЧЕНА"}
           </button>
         </section>
+        )}
 
         {/* Music Volume */}
         <section>

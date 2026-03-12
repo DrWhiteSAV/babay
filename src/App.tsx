@@ -8,7 +8,7 @@ import {
 import { usePlayerStore } from "./store/playerStore";
 import { TelegramProvider } from "./context/TelegramContext";
 import { useState, useEffect, useRef } from "react";
-import { useAudio, menuMusic, bgMusics } from "./hooks/useAudio";
+import { useAudio } from "./hooks/useAudio";
 import BottomNav from "./components/BottomNav";
 import { CutscenePlayer } from "./components/CutscenePlayer";
 import { supabase } from "./integrations/supabase/client";
@@ -68,7 +68,7 @@ function AppContent() {
   const { entryMode, isLoading, profile } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
   const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds, setPageBackgrounds, setVideoCutscenes } = usePlayerStore();
-  const { playClick } = useAudio(settings.musicVolume);
+  const { playClick, getMenuMusicUrls, getBgMusicUrls } = useAudio(settings.musicVolume);
   const location = useLocation();
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
@@ -118,12 +118,14 @@ function AppContent() {
 
     const isGame = location.pathname === "/game";
     const currentSrc = bgMusicRef.current.src;
-    let targetSrc = menuMusic;
+    const dbBgMusics = getBgMusicUrls();
+    const dbMenuMusics = getMenuMusicUrls();
+    let targetSrc = dbMenuMusics[Math.floor(Math.random() * dbMenuMusics.length)];
 
     if (isGame) {
-      const isPlayingGameMusic = bgMusics.some(m => currentSrc.includes(encodeURI(m)) || currentSrc === m);
+      const isPlayingGameMusic = dbBgMusics.some(m => currentSrc.includes(encodeURI(m)) || currentSrc === m);
       if (!isPlayingGameMusic) {
-        targetSrc = bgMusics[Math.floor(Math.random() * bgMusics.length)];
+        targetSrc = dbBgMusics[Math.floor(Math.random() * dbBgMusics.length)];
       } else {
         targetSrc = currentSrc;
       }
@@ -141,7 +143,7 @@ function AppContent() {
     }
 
     bgMusicRef.current.volume = (settings.musicVolume / 100) * 0.2;
-  }, [location.pathname, settings.musicVolume]);
+  }, [location.pathname, settings.musicVolume, getMenuMusicUrls, getBgMusicUrls]);
 
   useEffect(() => {
     const handleInteraction = () => {
@@ -162,7 +164,11 @@ function AppContent() {
   }, [updateEnergy]);
 
   useEffect(() => {
-    const handleClick = () => playClick();
+    const handleClick = () => {
+      // Disable click sounds on the game page
+      if (window.location.pathname === "/game") return;
+      playClick();
+    };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [playClick]);
@@ -213,7 +219,15 @@ function AppContent() {
     settings.buttonSize === "large" ? "btn-large" : "btn-medium";
 
   const currentPath = location.pathname;
-  const bgEntries = pageBackgrounds?.[currentPath];
+  // Map certain paths to share backgrounds with other pages
+  const bgMappedPath = (() => {
+    // PVP rooms and results use /hub backgrounds
+    if (currentPath.startsWith("/pvp/room/") || currentPath.startsWith("/pvp/results/")) return "/hub";
+    // All admin pages use /settings backgrounds
+    if (currentPath.startsWith("/admin")) return "/settings";
+    return currentPath;
+  })();
+  const bgEntries = pageBackgrounds?.[bgMappedPath];
   // Pick a random background from available entries (stable per page load via useMemo)
   const [randomBgIndex] = useState(() => Math.random());
   const customBg = bgEntries && bgEntries.length > 0
