@@ -162,7 +162,11 @@ function AppContent() {
   }, [updateEnergy]);
 
   useEffect(() => {
-    const handleClick = () => playClick();
+    const handleClick = () => {
+      // Disable click sounds on the game page
+      if (window.location.pathname === "/game") return;
+      playClick();
+    };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [playClick]);
