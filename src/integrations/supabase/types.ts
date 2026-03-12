@@ -145,6 +145,7 @@ export type Database = {
           id: string
           key: string
           label: string | null
+          sort_order: number
           updated_at: string
           value: string
         }
@@ -152,6 +153,7 @@ export type Database = {
           id?: string
           key: string
           label?: string | null
+          sort_order?: number
           updated_at?: string
           value: string
         }
@@ -159,6 +161,7 @@ export type Database = {
           id?: string
           key?: string
           label?: string | null
+          sort_order?: number
           updated_at?: string
           value?: string
         }
