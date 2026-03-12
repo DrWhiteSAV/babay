@@ -107,7 +107,8 @@ export default function GameHub() {
         {/* Background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/10 via-neutral-950/0 to-neutral-950/0 pointer-events-none" />
 
-        {/* 1. Avatar / Profile block */}
+        {/* 1. Avatar / Profile block — hidden for demo */}
+        {!isDemo && (
         <motion.button
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -135,6 +136,7 @@ export default function GameHub() {
             <p className="text-neutral-500 text-[10px] mt-2">Нажмите для перехода в профиль →</p>
           </div>
         </motion.button>
+        )}
 
         {/* 2. Play button */}
         <motion.div
