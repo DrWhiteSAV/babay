@@ -64,6 +64,14 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Restricts pages from Demo users — redirects to /hub */
+function DemoGuard({ children }: { children: React.ReactNode }) {
+  const { profile, isLoading } = useTelegram();
+  if (isLoading) return null;
+  if (profile?.role === "Демо") return <Navigate to="/hub" replace />;
+  return <>{children}</>;
+}
+
 function AppContent() {
   const { entryMode, isLoading, profile } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
