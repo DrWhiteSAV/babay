@@ -26,6 +26,7 @@ export default function GameHub() {
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const pvpLobby = usePvpLobby(profile?.telegram_id);
+  const isDemo = profile?.role === "Демо";
 
   useEffect(() => {
     const calc = () => {
