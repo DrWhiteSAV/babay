@@ -800,6 +800,8 @@ export default function Game() {
   }
 
   // ======== SCREENS ========
+
+  if (isGameOver) {
     // PVP room mode → show loading while DB write + redirect happen in useEffect
     if (pvpRoomId) {
       return (
