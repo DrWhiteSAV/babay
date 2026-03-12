@@ -118,12 +118,14 @@ function AppContent() {
 
     const isGame = location.pathname === "/game";
     const currentSrc = bgMusicRef.current.src;
-    let targetSrc = menuMusic;
+    const dbBgMusics = getBgMusicUrls();
+    const dbMenuMusics = getMenuMusicUrls();
+    let targetSrc = dbMenuMusics[Math.floor(Math.random() * dbMenuMusics.length)];
 
     if (isGame) {
-      const isPlayingGameMusic = bgMusics.some(m => currentSrc.includes(encodeURI(m)) || currentSrc === m);
+      const isPlayingGameMusic = dbBgMusics.some(m => currentSrc.includes(encodeURI(m)) || currentSrc === m);
       if (!isPlayingGameMusic) {
-        targetSrc = bgMusics[Math.floor(Math.random() * bgMusics.length)];
+        targetSrc = dbBgMusics[Math.floor(Math.random() * dbBgMusics.length)];
       } else {
         targetSrc = currentSrc;
       }
@@ -141,7 +143,7 @@ function AppContent() {
     }
 
     bgMusicRef.current.volume = (settings.musicVolume / 100) * 0.2;
-  }, [location.pathname, settings.musicVolume]);
+  }, [location.pathname, settings.musicVolume, getMenuMusicUrls, getBgMusicUrls]);
 
   useEffect(() => {
     const handleInteraction = () => {
