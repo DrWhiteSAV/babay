@@ -217,6 +217,12 @@ export default function Friends() {
     setTimeout(() => setCopiedInvite(false), 2000);
   };
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteText);
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2000);
+  };
+
   const handleSendEnergy = async () => {
     if (!energyModal) return;
     const { energy, useEnergy } = usePlayerStore.getState();
