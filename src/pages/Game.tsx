@@ -629,7 +629,12 @@ export default function Game() {
       }, 20000);
 
       try {
-        const newScenario = await generateScenario(currentStage, currentDiff, character.style, tgId);
+        const charDataForScenario = {
+          name: character.name, gender: character.gender, style: character.style,
+          wishes: character.wishes.join(", "), inventory: inventory.join(", ") || "нет предметов",
+          lore: character.lore || "", telekinesis: String(character.telekinesisLevel),
+        };
+        const newScenario = await generateScenario(currentStage, currentDiff, character.style, tgId, charDataForScenario);
         clearTimeout(aiTimeoutRef.current!);
         clearInterval(countInterval);
         setStageCountdown(0);
