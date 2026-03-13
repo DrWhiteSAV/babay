@@ -111,9 +111,13 @@ export default function Profile() {
   const referralLink = `https://t.me/Bab_AIbot/app?startapp=${profile?.telegram_id || ""}`;
 
 
+  const inviteText = character
+    ? `👻 Привет! Я — ${character.name}, бессмертный кибер-дух Бабай!\n\n🔥 Приглашаю тебя в игру «Бабай» — стань своим Бабаем, пугай жильцов и собирай арбузы!\n\n👇 Жми сюда:\n${referralLink}`
+    : referralLink;
+
   const handleCopyRef = () => {
-    navigator.clipboard.writeText(referralLink);
-    alert("Ссылка скопирована!");
+    navigator.clipboard.writeText(inviteText);
+    alert("Приглашение скопировано!");
   };
 
   const takeScreenshot = async () => {
