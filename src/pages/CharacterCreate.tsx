@@ -832,7 +832,7 @@ export default function CharacterCreate() {
               )}
             </AnimatePresence>
 
-            {/* "Далее" — only enabled after lore is generated */}
+            {/* "Создать Аватар" — only enabled after lore is generated, styled per selected style */}
             <AnimatePresence>
               {loreLocked && !loreTimeout && (
                 <motion.button
@@ -840,9 +840,21 @@ export default function CharacterCreate() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => setStep(3)}
-                  className="w-full py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white transition-all"
+                  style={{
+                    background: style === "Киберпанк" ? "linear-gradient(135deg, #06b6d4, #8b5cf6)" :
+                      style === "Хоррор" ? "linear-gradient(135deg, #450a0a, #7f1d1d)" :
+                      style === "Стимпанк" ? "linear-gradient(135deg, #78350f, #a16207)" :
+                      style === "Аниме" ? "linear-gradient(135deg, #ec4899, #a855f7)" :
+                      style === "Постсоветский" ? "linear-gradient(135deg, #374151, #6b7280)" :
+                      style === "Русская сказка" ? "linear-gradient(135deg, #065f46, #047857)" :
+                      style === "2D мультфильм" ? "linear-gradient(135deg, #f97316, #eab308)" :
+                      style === "Фентези деревня" ? "linear-gradient(135deg, #4338ca, #6d28d9)" :
+                      "linear-gradient(135deg, #dc2626, #991b1b)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                  }}
                 >
-                  Далее <ArrowRight size={18} />
+                  <Sparkles size={18} /> Создать Аватар
                 </motion.button>
               )}
             </AnimatePresence>
