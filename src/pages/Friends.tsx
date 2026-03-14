@@ -598,8 +598,17 @@ export default function Friends() {
                           if (!confirm(`Удалить ${friend.name}?`)) return;
                           deleteFriend(friend.name);
                           if (profile?.telegram_id) {
+                            // Delete A→B
                             await supabase.from("friends").delete()
                               .eq("telegram_id", profile.telegram_id).eq("friend_name", friend.name);
+                            // Delete B→A (mutual)
+                            if (meta.telegram_id) {
+                              const myName = character?.name || "";
+                              if (myName) {
+                                await supabase.from("friends").delete()
+                                  .eq("telegram_id", meta.telegram_id).eq("friend_telegram_id", profile.telegram_id);
+                              }
+                            }
                             setFriendsMeta(prev => { const n = { ...prev }; delete n[friend.name]; return n; });
                           }
                         }}

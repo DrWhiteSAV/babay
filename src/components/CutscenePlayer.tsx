@@ -37,11 +37,10 @@ const GameDescription = () => (
 /** Pick a random home background from pageBackgrounds["/"] */
 function useHomeBg() {
   const { pageBackgrounds } = usePlayerStore();
+  const [rng] = useState(() => Math.random());
   const entries = pageBackgrounds["/"];
   if (!entries || entries.length === 0) return null;
-  // Pick random each render (new mount = new random)
-  const [idx] = useState(() => Math.floor(Math.random() * entries.length));
-  const entry = entries[idx % entries.length];
+  const entry = entries[Math.floor(rng * entries.length) % entries.length];
   return entry?.url || null;
 }
 
