@@ -23,12 +23,12 @@ let audioSettingsPromise: Promise<Record<string, string[]>> | null = null;
 async function loadAudioSettings(): Promise<Record<string, string[]>> {
   if (audioSettingsCache) return audioSettingsCache;
   if (audioSettingsPromise) return audioSettingsPromise;
-  
+
   audioSettingsPromise = (async () => {
     const { data } = await supabase.from("audio_settings").select("key, value, sort_order").order("sort_order");
     const map: Record<string, string[]> = {};
     if (data) {
-      data.forEach(r => {
+      data.forEach((r) => {
         if (!map[r.key]) map[r.key] = [];
         if (r.value) map[r.key].push(r.value);
       });
@@ -36,7 +36,7 @@ async function loadAudioSettings(): Promise<Record<string, string[]>> {
     audioSettingsCache = map;
     return map;
   })();
-  
+
   return audioSettingsPromise;
 }
 
@@ -107,7 +107,9 @@ export const useAudio = (volume: number) => {
   const playClick = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
     if (!hasInteracted) return;
-    const urls = getUrls(dbAudio, "click", ["https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/ZvukButtonCam.MP3"]);
+    const urls = getUrls(dbAudio, "click", [
+      "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/ZvukButtonCam.MP3",
+    ]);
     const click = new Audio(pickRandom(urls));
     click.volume = volume / 100;
     click.play().catch(() => {});
@@ -116,7 +118,9 @@ export const useAudio = (volume: number) => {
   const playTransition = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
     if (!hasInteracted) return;
-    const urls = getUrls(dbAudio, "transition", ["https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Zvukwhoosh.MP3"]);
+    const urls = getUrls(dbAudio, "transition", [
+      "https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Zvukwhoosh.MP3",
+    ]);
     const whoosh = new Audio(pickRandom(urls));
     whoosh.volume = volume / 100;
     whoosh.play().catch(() => {});
@@ -133,7 +137,7 @@ export const useAudio = (volume: number) => {
       const fallbackMap: Record<string, string[]> = {
         scream: ["https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Zvukscream.MP3"],
         cat: ["https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/ZvukMeow.MP3"],
-        fear: ["https://xupshaktgycrrcfgvcno.supabase.co/storage/v1/object/public/song/Zvukheartbeat.MP3"],
+        fear: ["https://psuvnvqvspqibsezcrny.supabase.co/storage/v1/object/public/SongBabai/Zvukheartbeat.MP3"],
       };
 
       const urls = getUrls(dbAudio, type, fallbackMap[type]);
