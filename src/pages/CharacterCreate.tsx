@@ -748,6 +748,9 @@ export default function CharacterCreate() {
               )}
             </div>
 
+            {/* Styles - only show after name is generated */}
+            {nameLocked && !nameTimeout && (
+            <>
             <h3 className="text-xl font-bold text-white">Выбери стиль</h3>
             <p className="text-xs text-neutral-400">Стиль сразу меняет оформление — выбери и нажми «Создать легенду!»</p>
             <div className="grid grid-cols-2 gap-3">
@@ -755,7 +758,7 @@ export default function CharacterCreate() {
                 <button
                   key={s}
                   onClick={() => handleStyleSelect(s)}
-                  disabled={isGeneratingName || isGeneratingLore || nameTimeout}
+                  disabled={isGeneratingLore}
                   className={`p-3 rounded-xl border text-sm font-medium transition-all relative ${style === s ? "border-red-600 bg-red-900/30 text-white" : "border-neutral-800 bg-neutral-900 text-neutral-400 hover:bg-neutral-800"} disabled:opacity-60`}
                 >
                   {s}
@@ -763,6 +766,8 @@ export default function CharacterCreate() {
                 </button>
               ))}
             </div>
+            </>
+            )}
 
             {/* "Создать легенду!" button — appears after style selected, before lore generated */}
             <AnimatePresence>
@@ -827,7 +832,7 @@ export default function CharacterCreate() {
               )}
             </AnimatePresence>
 
-            {/* "Далее" — only enabled after lore is generated */}
+            {/* "Создать Аватар" — only enabled after lore is generated, styled per selected style */}
             <AnimatePresence>
               {loreLocked && !loreTimeout && (
                 <motion.button
@@ -835,9 +840,21 @@ export default function CharacterCreate() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => setStep(3)}
-                  className="w-full py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 text-white transition-all"
+                  style={{
+                    background: style === "Киберпанк" ? "linear-gradient(135deg, #06b6d4, #8b5cf6)" :
+                      style === "Хоррор" ? "linear-gradient(135deg, #450a0a, #7f1d1d)" :
+                      style === "Стимпанк" ? "linear-gradient(135deg, #78350f, #a16207)" :
+                      style === "Аниме" ? "linear-gradient(135deg, #ec4899, #a855f7)" :
+                      style === "Постсоветский" ? "linear-gradient(135deg, #374151, #6b7280)" :
+                      style === "Русская сказка" ? "linear-gradient(135deg, #065f46, #047857)" :
+                      style === "2D мультфильм" ? "linear-gradient(135deg, #f97316, #eab308)" :
+                      style === "Фентези деревня" ? "linear-gradient(135deg, #4338ca, #6d28d9)" :
+                      "linear-gradient(135deg, #dc2626, #991b1b)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                  }}
                 >
-                  Далее <ArrowRight size={18} />
+                  <Sparkles size={18} /> Создать Аватар
                 </motion.button>
               )}
             </AnimatePresence>
@@ -879,51 +896,58 @@ export default function CharacterCreate() {
             </div>
 
             {/* Avatar section */}
-            <div className="pt-2">
+            <div className="pt-2 relative">
               <h3 className="text-lg font-bold text-white mb-3">Аватар</h3>
 
-              <AnimatePresence mode="wait">
-                {currentAvatarPreview ? (
-                  <motion.div key="preview" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative mb-4">
-                    <img
-                      src={currentAvatarPreview}
-                      alt="Аватар"
-                      className="w-full max-h-72 object-cover rounded-2xl border-2 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
-                    />
-                    {!selectedDefaultImage && avatarStatus === "done" && (
-                      <div className="absolute top-2 right-2 bg-green-900/80 border border-green-600 rounded-lg px-2 py-1 flex items-center gap-1">
-                        <CheckCircle size={12} className="text-green-400" />
-                        <span className="text-xs text-green-400">В Telegram и галерее</span>
-                      </div>
-                    )}
-                  </motion.div>
-                ) : isGeneratingAvatar ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="w-full h-48 rounded-2xl border-2 border-neutral-700 flex flex-col items-center justify-center gap-3 bg-neutral-900/50 mb-4"
-                  >
-                    <Loader2 size={32} className="animate-spin text-red-500" />
-                    <p className="text-sm text-neutral-400">
-                      {avatarStatus === "uploading" ? "Сохраняем в хранилище..." :
-                       avatarStatus === "sending_tg" ? "Отправляем в Telegram..." :
-                       "Генерируем облик через ProTalk..."}
-                    </p>
-                    {avatarCountdown > 0 && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-32 h-1.5 bg-neutral-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-red-500 rounded-full transition-all duration-1000"
-                            style={{ width: `${(avatarCountdown / AVATAR_TIMEOUT) * 100}%` }}
-                          />
+              {/* Avatar generation overlay */}
+              {(isGeneratingAvatar || (avatarLocked && generatedAvatarUrl)) && (
+                <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-6">
+                  <AnimatePresence mode="wait">
+                    {isGeneratingAvatar ? (
+                      <motion.div key="gen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4">
+                        <Loader2 size={48} className="animate-spin text-red-500" />
+                        <p className="text-lg text-white font-bold">
+                          {avatarStatus === "uploading" ? "Сохраняем в хранилище..." :
+                           avatarStatus === "sending_tg" ? "Отправляем в Telegram..." :
+                           "Генерируем облик..."}
+                        </p>
+                        {avatarCountdown > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-40 h-2 bg-neutral-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-red-500 rounded-full transition-all duration-1000" style={{ width: `${(avatarCountdown / AVATAR_TIMEOUT) * 100}%` }} />
+                            </div>
+                            <span className="text-sm font-mono text-red-400">{formatCountdown(avatarCountdown)}</span>
+                          </div>
+                        )}
+                      </motion.div>
+                    ) : generatedAvatarUrl ? (
+                      <motion.div key="done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-6 w-full max-w-sm">
+                        <img
+                          src={generatedAvatarUrl}
+                          alt="Аватар"
+                          className="w-full max-h-[50vh] object-cover rounded-2xl border-2 border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)]"
+                        />
+                        <div className="flex items-center gap-2 text-green-400 text-sm">
+                          <CheckCircle size={16} /> Аватар создан и сохранён
                         </div>
-                        <span className="text-xs font-mono text-red-400">{formatCountdown(avatarCountdown)}</span>
-                      </div>
-                    )}
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
+                        <button
+                          onClick={handleFinish}
+                          disabled={isSaving}
+                          className="w-full py-5 rounded-2xl font-black text-xl text-white transition-all active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(220,38,38,0.4)]"
+                          style={{
+                            background: "linear-gradient(135deg, #dc2626, #991b1b)",
+                          }}
+                        >
+                          {isSaving
+                            ? <><Loader2 size={20} className="animate-spin" /> Сохраняем...</>
+                            : <>Войти в мир Бабаев 🌍</>
+                          }
+                        </button>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              )}
 
               {/* Timeout / retry for avatar */}
               {avatarTimeout && !isGeneratingAvatar && !currentAvatarPreview && (
@@ -946,6 +970,17 @@ export default function CharacterCreate() {
                 </motion.div>
               )}
 
+              {/* Show preview only if template selected (not generated - that's in overlay) */}
+              {selectedDefaultImage && (
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative mb-4">
+                  <img
+                    src={selectedDefaultImage}
+                    alt="Аватар"
+                    className="w-full max-h-72 object-cover rounded-2xl border-2 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                  />
+                </motion.div>
+              )}
+
               {!selectedDefaultImage && !avatarLocked && !avatarTimeout && (
                 <button
                   onClick={handleGenerateAvatar}
@@ -953,15 +988,10 @@ export default function CharacterCreate() {
                   className="w-full py-3 border border-red-700 bg-red-900/20 hover:bg-red-900/40 text-red-300 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait mb-4"
                 >
                   {isGeneratingAvatar
-                    ? <><Loader2 size={16} className="animate-spin" /> {avatarStatus === "uploading" ? "Сохраняем..." : "Генерируем..."}</>
+                    ? <><Loader2 size={16} className="animate-spin" /> Генерируем...</>
                     : <><Sparkles size={16} /> Сгенерировать аватар ИИ</>
                   }
                 </button>
-              )}
-              {avatarLocked && generatedAvatarUrl && (
-                <div className="w-full py-2 text-center text-xs text-green-500 mb-4">
-                  ✓ Аватар создан и сохранён. Повторная генерация недоступна.
-                </div>
               )}
 
               {/* DB Templates grid */}
@@ -1002,16 +1032,19 @@ export default function CharacterCreate() {
               </div>
             )}
 
-            <button
-              onClick={handleFinish}
-              disabled={isSaving || (!generatedAvatarUrl && !selectedDefaultImage)}
-              className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {isSaving
-                ? <><Loader2 size={16} className="animate-spin" /> Сохраняем духа...</>
-                : <>Войти в мир Бабаев <ArrowRight size={18} /></>
-              }
-            </button>
+            {/* Enter world button for template selection (not AI generated) */}
+            {selectedDefaultImage && (
+              <button
+                onClick={handleFinish}
+                disabled={isSaving}
+                className="w-full py-4 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {isSaving
+                  ? <><Loader2 size={16} className="animate-spin" /> Сохраняем духа...</>
+                  : <>Войти в мир Бабаев <ArrowRight size={18} /></>
+                }
+              </button>
+            )}
           </motion.div>
         )}
       </div>

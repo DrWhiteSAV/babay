@@ -7,10 +7,10 @@ import { Play, Settings as SettingsIcon, Loader2 } from "lucide-react";
 /** Pick a random home background from pageBackgrounds["/"] */
 function useHomeBg() {
   const { pageBackgrounds } = usePlayerStore();
+  const [rng] = useState(() => Math.random());
   const entries = pageBackgrounds["/"];
   if (!entries || entries.length === 0) return null;
-  const [idx] = useState(() => Math.floor(Math.random() * entries.length));
-  const entry = entries[idx % entries.length];
+  const entry = entries[Math.floor(rng * entries.length) % entries.length];
   return entry || null;
 }
 
