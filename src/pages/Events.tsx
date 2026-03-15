@@ -80,6 +80,7 @@ function EventCard({
   const progress = isGlobal ? (globalProgress ?? 0) : (playerEvent?.progress ?? 0);
   const target = event.target || 1;
   const completed = playerEvent?.status === 'completed';
+  // For global events, check if global progress >= target; for daily, personal progress
   const isReady = !completed && progress >= target;
 
   const rewardText = [
