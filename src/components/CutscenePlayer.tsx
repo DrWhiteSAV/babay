@@ -54,13 +54,13 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
   const hasTriedPlayRef = useRef(false);
 
   const homeBg = useHomeBg();
-  // Use home bg from admin/pic instead of hardcoded unsplash
+  // Use home bg from admin/pic — with lighter dimming for cutscene loading
   const bgStyle = homeBg
     ? {
         backgroundImage: `url(${homeBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        filter: 'grayscale(80%) contrast(130%) brightness(0.5)',
+        filter: 'grayscale(40%) contrast(110%) brightness(0.6)',
       }
     : {
         backgroundImage: 'url("https://images.unsplash.com/photo-1485236715568-ddc5ee6ca227?q=80&w=2000&auto=format&fit=crop")',
