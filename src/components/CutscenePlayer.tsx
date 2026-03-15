@@ -157,12 +157,12 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
       )}
 
       {needsInteraction && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/60 overflow-hidden">
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <div
-            className="absolute inset-0 w-full h-full opacity-30 animate-zoom-pulse pointer-events-none origin-center"
+            className="absolute inset-0 w-full h-full opacity-50 animate-zoom-pulse pointer-events-none origin-center"
             style={bgStyle}
           />
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.9)_100%)] z-10" />
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.7)_100%)] z-10" />
           <div className="relative z-20 flex flex-col items-center">
             <button
               onClick={handleManualPlay}
