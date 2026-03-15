@@ -54,6 +54,7 @@ import TelegramOnly from "./pages/TelegramOnly";
 import PvpSetup from "./pages/PvpSetup";
 import PvpRoom from "./pages/PvpRoom";
 import PvpResults from "./pages/PvpResults";
+import PvpHistory from "./pages/PvpHistory";
 
 /** Restricts a route to Супер-Бабай and Ад-Бабай only */
 function AdminGuard({ children }: { children: React.ReactNode }) {
