@@ -566,19 +566,27 @@ export default function PvpRoom() {
       </div>
 
       {/* Bottom action */}
-      <div className="p-4 bg-black/20 backdrop-blur-lg border-t border-white/10 shrink-0">
+      <div className="p-4 bg-black/20 backdrop-blur-lg border-t border-white/10 shrink-0 space-y-2">
         {isOrganizer && room.status === "waiting" && (
-          <button
-            onClick={handleStart}
-            disabled={starting || joinedMembers.length < 2}
-            className="w-full py-4 bg-red-700 hover:bg-red-600 disabled:opacity-50 rounded-xl font-black text-lg uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(220,38,38,0.35)] transition-all"
-          >
-            {starting ? (
-              <><Loader2 size={20} className="animate-spin" /> Запуск...</>
-            ) : (
-              <><Swords size={20} /> НАЧАТЬ ИГРУ ({joinedMembers.length} участника)</>
-            )}
-          </button>
+          <>
+            <button
+              onClick={handleStart}
+              disabled={starting || joinedMembers.length < 2}
+              className="w-full py-4 bg-red-700 hover:bg-red-600 disabled:opacity-50 rounded-xl font-black text-lg uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(220,38,38,0.35)] transition-all"
+            >
+              {starting ? (
+                <><Loader2 size={20} className="animate-spin" /> Запуск...</>
+              ) : (
+                <><Swords size={20} /> НАЧАТЬ ИГРУ ({joinedMembers.length} участника)</>
+              )}
+            </button>
+            <button
+              onClick={handleCancelPvp}
+              className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl font-bold text-sm text-red-400 transition-colors"
+            >
+              Отменить PVP
+            </button>
+          </>
         )}
         {!isOrganizer && isJoined && room.status === "waiting" && (
           <div className="w-full py-4 bg-neutral-900 rounded-xl text-center text-neutral-400 flex items-center justify-center gap-2">
