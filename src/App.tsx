@@ -290,6 +290,7 @@ function AppContent() {
           <Route path="/pvp" element={<DemoGuard><PvpSetup /></DemoGuard>} />
           <Route path="/pvp/room/:roomId" element={<DemoGuard><PvpRoom /></DemoGuard>} />
           <Route path="/pvp/results/:roomId" element={<DemoGuard><PvpResults /></DemoGuard>} />
+          <Route path="/pvp/history" element={<DemoGuard><PvpHistory /></DemoGuard>} />
           <Route path="/admin" element={<AdminGuard><Admin /></AdminGuard>} />
           <Route path="/admin/pic" element={<AdminGuard><AdminPic /></AdminGuard>} />
           <Route path="/admin/video" element={<AdminGuard><AdminVideo /></AdminGuard>} />
