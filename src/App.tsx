@@ -230,8 +230,8 @@ function AppContent() {
   const currentPath = location.pathname;
   // Map certain paths to share backgrounds with other pages
   const bgMappedPath = (() => {
-    // PVP rooms and results use /hub backgrounds
-    if (currentPath.startsWith("/pvp/room/") || currentPath.startsWith("/pvp/results/")) return "/hub";
+    // PVP rooms, results, and history use /hub backgrounds
+    if (currentPath.startsWith("/pvp/")) return "/hub";
     // All admin pages use /settings backgrounds
     if (currentPath.startsWith("/admin")) return "/settings";
     return currentPath;
