@@ -25,7 +25,9 @@ export default function GameHub() {
   const { profile } = useTelegram();
   const [infoModal, setInfoModal] = useState<CurrencyType>(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const pvpLobby = usePvpLobby(profile?.telegram_id);
+  const pvpLobbies = usePvpLobbies(profile?.telegram_id);
+  // Only show active (waiting/playing) lobbies on hub, not finished
+  const activeLobbies = pvpLobbies.filter(l => l.room.status === "waiting" || l.room.status === "playing");
   const isDemo = profile?.role === "Демо";
 
   useEffect(() => {
