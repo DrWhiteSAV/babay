@@ -262,6 +262,7 @@ export default function GameHub() {
             <p className="text-[10px] text-neutral-500">Предметы и усиления</p>
           </button>
           {!isDemo && (
+          <>
           <button
             onClick={() => navigate("/friends")}
             data-theme-block="hub-friends"
@@ -273,6 +274,7 @@ export default function GameHub() {
             <p className="font-bold text-white text-sm">Друзья</p>
             <p className="text-[10px] text-neutral-500">Чаты и команда</p>
           </button>
+          </>
           )}
         </motion.div>
 
