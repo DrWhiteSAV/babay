@@ -156,15 +156,20 @@ export default function GameHub() {
           </button>
         </motion.div>
 
-        {/* 2.5. Active PVP Lobby Banner */}
-        {!isDemo && pvpLobby && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-          >
-            <PvpLobbyBanner lobby={pvpLobby} />
-          </motion.div>
+        {/* 2.5. Active PVP Lobby Banners (multiple) */}
+        {!isDemo && activeLobbies.length > 0 && (
+          <div className="space-y-3">
+            {activeLobbies.map((lobby, idx) => (
+              <motion.div
+                key={lobby.room.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 + idx * 0.05 }}
+              >
+                <PvpLobbyBanner lobby={lobby} />
+              </motion.div>
+            ))}
+          </div>
         )}
 
         {/* 3. Leaderboard + Chats row — hidden for demo */}
