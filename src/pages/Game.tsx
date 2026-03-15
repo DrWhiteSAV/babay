@@ -629,9 +629,16 @@ export default function Game() {
       }, 20000);
 
       try {
+        // Resolve inventory item IDs to their display names from shop
+        const { shopItems: storeShopItems, bossItems: storeBossItems } = usePlayerStore.getState();
+        const allShopItems = [...storeShopItems, ...storeBossItems];
+        const inventoryNames = inventory
+          .map(id => allShopItems.find(si => si.id === id)?.name)
+          .filter(Boolean)
+          .join(", ") || "нет предметов";
         const charDataForScenario = {
           name: character.name, gender: character.gender, style: character.style,
-          wishes: character.wishes.join(", "), inventory: inventory.join(", ") || "нет предметов",
+          wishes: character.wishes.join(", "), inventory: inventoryNames,
           lore: character.lore || "", telekinesis: String(character.telekinesisLevel),
         };
         const newScenario = await generateScenario(currentStage, currentDiff, character.style, tgId, charDataForScenario);
