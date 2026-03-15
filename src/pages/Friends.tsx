@@ -688,6 +688,10 @@ export default function Friends() {
           </div>
         )}
       </AnimatePresence>
+      {/* Social links */}
+      <div className="relative z-10 px-4 pb-6">
+        <SocialLinksBlock />
+      </div>
 
       {showProfilePopup && (
         <ProfilePopup

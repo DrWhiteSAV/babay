@@ -658,6 +658,9 @@ export default function Settings() {
           </button>
         </section>
 
+        {/* Social links */}
+        <SocialLinksBlock />
+
         <div className="flex justify-center pt-8 pb-4 opacity-50">
           <img 
             src="https://i.ibb.co/BVgY7XrT/babai.png" 
