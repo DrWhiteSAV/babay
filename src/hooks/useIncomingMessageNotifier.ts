@@ -21,6 +21,7 @@ export function useIncomingMessageNotifier() {
   const { friends, groupChats, character } = usePlayerStore();
   const location = useLocation();
   const lastActivityRef = useRef<number>(Date.now());
+  const senderGenderRef = useRef<Record<number, string>>({});
 
   // Track last user activity to determine online status
   useEffect(() => {
