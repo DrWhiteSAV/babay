@@ -983,7 +983,7 @@ export default function Game() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 flex justify-between items-center p-4 bg-neutral-950/50 backdrop-blur-sm border-b border-neutral-800">
+      <header className="relative z-10 flex justify-between items-center p-4 pt-12 bg-neutral-950/50 backdrop-blur-sm border-b border-neutral-800">
         <div className="flex items-center gap-3">
           <button
             onClick={async () => {
