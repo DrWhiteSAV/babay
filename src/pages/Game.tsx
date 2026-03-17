@@ -946,7 +946,7 @@ export default function Game() {
 
   // Main game screen
   return (
-    <div className="flex-1 flex flex-col bg-transparent text-white relative">
+    <div className="flex-1 flex flex-col bg-transparent text-white relative overflow-y-auto">
       <AnimatePresence>
         {showScreamer && (
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-center justify-center bg-red-900">
