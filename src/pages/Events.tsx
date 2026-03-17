@@ -176,14 +176,20 @@ export default function Events() {
     if (profile?.telegram_id && evts) {
       const dailyEvts = evts.filter(e => e.event_type === 'daily');
       for (const evt of dailyEvts) {
+        // Upsert with target from event; update target if event target changed
         await supabase.from("player_events").upsert({
           telegram_id: profile.telegram_id,
           event_id: evt.id,
           status: 'assigned',
           target: evt.target || 1,
-        }, { onConflict: "telegram_id,event_id", ignoreDuplicates: true }).then(() => {});
+        }, { onConflict: "telegram_id,event_id", ignoreDuplicates: true });
+        // Also update target in case it changed in admin
+        await supabase.from("player_events")
+          .update({ target: evt.target || 1 })
+          .eq("telegram_id", profile.telegram_id)
+          .eq("event_id", evt.id)
+          .eq("status", "assigned");
       }
-      // Also ensure global events have player_events records so they can be claimed
       const globalEvts = evts.filter(e => e.event_type === 'global');
       for (const evt of globalEvts) {
         await supabase.from("player_events").upsert({
@@ -191,7 +197,12 @@ export default function Events() {
           event_id: evt.id,
           status: 'assigned',
           target: evt.target || 1,
-        }, { onConflict: "telegram_id,event_id", ignoreDuplicates: true }).then(() => {});
+        }, { onConflict: "telegram_id,event_id", ignoreDuplicates: true });
+        await supabase.from("player_events")
+          .update({ target: evt.target || 1 })
+          .eq("telegram_id", profile.telegram_id)
+          .eq("event_id", evt.id)
+          .eq("status", "assigned");
       }
 
       const { data: pe } = await supabase
