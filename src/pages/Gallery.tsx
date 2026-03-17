@@ -107,10 +107,14 @@ export default function Gallery() {
     ? items
     : items.filter(item => getCategory(item) === activeSection);
 
+  const bgItems = items.filter(i => getCategory(i) === "backgrounds");
+  const bgCount = bgItems.length;
+  const BG_LIMIT = 10;
+
   const sectionTabs: { key: Section; label: string; icon: React.ReactNode }[] = [
     { key: "all", label: "Все", icon: <ImageIcon size={14} /> },
     { key: "avatars", label: "Аватары", icon: <User size={14} /> },
-    { key: "backgrounds", label: "Фоны", icon: <Mountain size={14} /> },
+    { key: "backgrounds", label: `Фоны (${bgCount}/${BG_LIMIT})`, icon: <Mountain size={14} /> },
     { key: "bosses", label: "Боссы", icon: <Skull size={14} /> },
   ];
 
