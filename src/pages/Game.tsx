@@ -976,7 +976,7 @@ export default function Game() {
 
   // Main game screen
   return (
-    <div className="flex-1 flex flex-col bg-transparent text-white relative overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-transparent text-white relative overflow-hidden min-h-[100dvh]">
       <AnimatePresence>
         {showScreamer && (
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-center justify-center bg-red-900">
@@ -993,19 +993,22 @@ export default function Game() {
       <audio ref={audioRef} className="hidden" />
 
       {/* Background Image */}
-      <div className="fixed inset-0 z-0 bg-neutral-950">
+      <div className="fixed inset-0 z-0 bg-neutral-950 pointer-events-none">
         {isBossBattle && bossImage && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none blur-xl scale-110"
+            className="absolute inset-0 bg-cover bg-center opacity-30 blur-xl scale-110"
             style={{ backgroundImage: `url(${bossImage})` }}
           />
         )}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-50 pointer-events-none transition-opacity duration-1000"
+          className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
           style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
         />
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: `rgba(0, 0, 0, ${generatedBgOverlayOpacity})` }}
+        />
       </div>
-      <div className="fixed inset-0 z-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none" />
 
       <div className="fog-container">
         <div className="fog-layer"></div>
@@ -1013,7 +1016,7 @@ export default function Game() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 flex justify-between items-center p-4 pt-12 bg-neutral-950/50 backdrop-blur-sm border-b border-neutral-800">
+      <header className="relative z-10 flex justify-between items-center p-4 pt-[calc(env(safe-area-inset-top)+2.5rem)] bg-neutral-950/30 backdrop-blur-sm border-b border-neutral-800">
         <div className="flex items-center gap-3">
           <button
             onClick={async () => {
