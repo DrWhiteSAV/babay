@@ -4,7 +4,7 @@ import { usePlayerStore } from "../store/playerStore";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 import { motion, AnimatePresence } from "motion/react";
-import { Skull, Loader2, Trophy, Crown, Timer } from "lucide-react";
+import { Skull, Loader2, Trophy, Crown, Timer, X } from "lucide-react";
 
 interface RoomMember {
   telegram_id: number;
