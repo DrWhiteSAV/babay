@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { usePlayerStore, ButtonSize, FontFamily, Theme } from "../store/playerStore";
+import { usePlayerStore, ButtonSize, FontFamily, Theme, DEFAULT_SETTINGS } from "../store/playerStore";
 import { useTelegram } from "../context/TelegramContext";
 import { supabase } from "../integrations/supabase/client";
 
