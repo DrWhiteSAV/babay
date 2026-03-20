@@ -178,6 +178,12 @@ export const DEFAULT_SETTINGS = {
   theme: "normal" as Theme,
   musicVolume: 50,
   ttsEnabled: false,
+  volumeBgMusic: 50,
+  volumeBgSounds: 50,
+  volumeClicks: 50,
+  volumeTransitions: 50,
+  volumeCutscene: 50,
+  volumeAnswerSfx: 50,
 };
 
 // Pure in-memory store — NO localStorage persistence at all
