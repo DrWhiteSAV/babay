@@ -513,12 +513,14 @@ export default function Profile() {
             onClick={(e) => e.stopPropagation()}
             className="relative bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl max-h-[85vh] overflow-y-auto"
           >
-            <button
-              onClick={() => setSelectedItem(null)}
-              className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-white bg-neutral-800 rounded-full transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex justify-center mb-2">
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="p-2 text-neutral-400 hover:text-white bg-neutral-800 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
             <div className="flex flex-col items-center text-center mt-4">
               <div className="w-24 h-24 rounded-3xl bg-neutral-800 flex items-center justify-center text-5xl mb-4 shadow-inner">
