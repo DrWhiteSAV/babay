@@ -6,7 +6,7 @@ import { supabase } from "../integrations/supabase/client";
 const FALLBACK_AVATAR = "https://i.ibb.co/BVgY7XrT/babai.png";
 
 // Use DEFAULT_SETTINGS from playerStore
-};
+
 
 const BUTTON_SIZES: ButtonSize[] = ["small", "medium", "large"];
 const FONT_FAMILIES: FontFamily[] = [
