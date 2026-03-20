@@ -272,7 +272,16 @@ export default function AdminEvents() {
                   </div>
                 </div>
 
-                {/* Active toggle */}
+                {/* Target (goal) */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-neutral-500 uppercase font-bold">🎯 Цель (target) — сколько нужно выполнить</label>
+                  <input type="number" min={1} value={form.target}
+                    onChange={e => upd("target", parseInt(e.target.value) || 1)}
+                    placeholder="Например: 5, 1000, 1000000"
+                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500" />
+                  <p className="text-[9px] text-neutral-600">Для ежедневных — цель на игрока. Для глобальных — сумма по всем игрокам.</p>
+                </div>
+
                 <label className="flex items-center gap-3 cursor-pointer">
                   <div onClick={() => upd("is_active", !form.is_active)}
                     className={`w-10 h-5 rounded-full flex items-center transition-colors ${form.is_active ? "bg-orange-600" : "bg-neutral-700"}`}>
