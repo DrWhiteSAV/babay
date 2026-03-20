@@ -499,7 +499,37 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Save Settings Button */}
+        {/* Granular Volume Controls */}
+        <section>
+          <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-2">
+            <Volume2 size={18} /> Настройки громкости
+          </h2>
+          <div className="space-y-4">
+            {([
+              { key: "volumeBgMusic" as const, label: "🎵 Фоновая музыка меню и игры", value: settings.volumeBgMusic },
+              { key: "volumeBgSounds" as const, label: "🌿 Фоновые звуки", value: settings.volumeBgSounds },
+              { key: "volumeClicks" as const, label: "👆 Звуки кликов", value: settings.volumeClicks },
+              { key: "volumeTransitions" as const, label: "🚪 Звуки переходов на страницы", value: settings.volumeTransitions },
+              { key: "volumeCutscene" as const, label: "🎬 Катсцены видео", value: settings.volumeCutscene },
+              { key: "volumeAnswerSfx" as const, label: "✅ Звуки ответов (успех/неудача)", value: settings.volumeAnswerSfx },
+            ]).map(item => (
+              <div key={item.key} className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-neutral-300">{item.label}</span>
+                  <span className="text-sm font-bold text-white">{item.value ?? 50}%</span>
+                </div>
+                <input
+                  type="range" min="0" max="100"
+                  value={item.value ?? 50}
+                  onChange={(e) => updateSettings({ [item.key]: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-red-600"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+
+
         <section>
           <button
             onClick={handleSaveSettings}
