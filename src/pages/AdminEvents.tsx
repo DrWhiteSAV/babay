@@ -90,6 +90,7 @@ export default function AdminEvents() {
       reward_fear: form.reward_fear || 0,
       reward_watermelons: form.reward_watermelons || 0,
       reward_energy: form.reward_energy || 0,
+      target: form.target || 1,
     };
 
     if (editId) {
