@@ -120,6 +120,12 @@ export interface PlayerState {
     theme: Theme;
     musicVolume: number;
     ttsEnabled: boolean;
+    volumeBgMusic: number;
+    volumeBgSounds: number;
+    volumeClicks: number;
+    volumeTransitions: number;
+    volumeCutscene: number;
+    volumeAnswerSfx: number;
   };
   globalBackgroundUrl: string | null;
   pageBackgrounds: Record<string, Array<{ url: string; dimming: number }>>;
