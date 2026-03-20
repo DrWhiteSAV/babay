@@ -138,6 +138,24 @@ export default function AdminEvents() {
     load();
   };
 
+  const handleSyncTargets = async () => {
+    setSyncing(true);
+    try {
+      for (const ev of events) {
+        await supabase
+          .from("player_events")
+          .update({ target: ev.target || 1 })
+          .eq("event_id", ev.id)
+          .eq("status", "assigned");
+      }
+      alert("✅ Targets синхронизированы во всех player_events!");
+    } catch (e) {
+      console.error("Sync error:", e);
+      alert("❌ Ошибка синхронизации");
+    }
+    setSyncing(false);
+  };
+
   const upd = (field: string, value: any) => setForm(f => ({ ...f, [field]: value }));
 
   const selectedType = EVENT_TYPES.find(t => t.value === form.event_type);
