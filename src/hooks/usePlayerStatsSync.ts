@@ -40,6 +40,12 @@ const normalizeSettings = (raw: unknown) => {
     theme: THEMES.includes(cs.theme as Theme) ? (cs.theme as Theme) : DEFAULT_SETTINGS.theme,
     musicVolume: typeof cs.musicVolume === "number" ? cs.musicVolume : DEFAULT_SETTINGS.musicVolume,
     ttsEnabled: typeof cs.ttsEnabled === "boolean" ? cs.ttsEnabled : DEFAULT_SETTINGS.ttsEnabled,
+    volumeBgMusic: typeof cs.volumeBgMusic === "number" ? cs.volumeBgMusic : DEFAULT_SETTINGS.volumeBgMusic,
+    volumeBgSounds: typeof cs.volumeBgSounds === "number" ? cs.volumeBgSounds : DEFAULT_SETTINGS.volumeBgSounds,
+    volumeClicks: typeof cs.volumeClicks === "number" ? cs.volumeClicks : DEFAULT_SETTINGS.volumeClicks,
+    volumeTransitions: typeof cs.volumeTransitions === "number" ? cs.volumeTransitions : DEFAULT_SETTINGS.volumeTransitions,
+    volumeCutscene: typeof cs.volumeCutscene === "number" ? cs.volumeCutscene : DEFAULT_SETTINGS.volumeCutscene,
+    volumeAnswerSfx: typeof cs.volumeAnswerSfx === "number" ? cs.volumeAnswerSfx : DEFAULT_SETTINGS.volumeAnswerSfx,
   };
 };
 
