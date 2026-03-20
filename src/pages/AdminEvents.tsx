@@ -195,6 +195,16 @@ export default function AdminEvents() {
           <Plus size={18} /> Создать новый эвент
         </button>
 
+        {/* Sync targets button */}
+        <button
+          onClick={handleSyncTargets}
+          disabled={syncing || events.length === 0}
+          className="w-full py-3 bg-blue-900/50 hover:bg-blue-800/60 text-blue-300 border border-blue-900/50 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {syncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          Синхронизировать target → player_events
+        </button>
+
         {/* Form */}
         <AnimatePresence>
           {showForm && (
