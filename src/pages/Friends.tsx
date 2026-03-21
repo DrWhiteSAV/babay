@@ -232,34 +232,89 @@ export default function Friends() {
   };
 
   const handleAddFoundFriend = async () => {
-    if (!foundUser) return;
-    const nameToAdd = foundUser.character_name || foundUser.first_name;
-    addFriend(nameToAdd);
-    if (profile?.telegram_id) {
-      const myName = character?.name || "";
-
-      // Insert A→B
-      const { error } = await supabase.from("friends").upsert({
-        telegram_id: profile.telegram_id,
-        friend_name: nameToAdd,
-        friend_telegram_id: foundUser.telegram_id,
-      }, { onConflict: "telegram_id,friend_name" });
-      if (error) console.error("Friend save error:", error);
-
-      // Insert B→A (mutual) — only if the other user has a character
-      if (myName && foundUser.telegram_id) {
-        await supabase.from("friends").upsert({
-          telegram_id: foundUser.telegram_id,
-          friend_name: myName,
-          friend_telegram_id: profile.telegram_id,
-        }, { onConflict: "telegram_id,friend_name" });
+    if (!foundUser || !profile?.telegram_id) return;
+    setRequestSending(true);
+    try {
+      // Check if already friends
+      const existingFriend = friends.find(f => f.name === (foundUser.character_name || foundUser.first_name));
+      if (existingFriend) {
+        alert("Этот пользователь уже в вашем списке друзей!");
+        setRequestSending(false);
+        return;
       }
-
-      notifyFriendAdded(profile.telegram_id, foundUser.telegram_id);
+      // Check if request already sent
+      const existing = outgoingRequests.find(r => r.to_telegram_id === foundUser.telegram_id);
+      if (existing) {
+        alert("Заявка уже отправлена!");
+        setRequestSending(false);
+        return;
+      }
+      // Send friend request
+      const { error } = await supabase.from("friend_requests").upsert({
+        from_telegram_id: profile.telegram_id,
+        to_telegram_id: foundUser.telegram_id,
+        from_character_name: character?.name || null,
+        status: "pending",
+      }, { onConflict: "from_telegram_id,to_telegram_id" });
+      if (error) {
+        console.error("Friend request error:", error);
+      } else {
+        setOutgoingRequests(prev => [...prev, { id: "temp", to_telegram_id: foundUser.telegram_id, status: "pending", created_at: new Date().toISOString() }]);
+        // Send telegram notification
+        try {
+          const caption = `👋 *Заявка в друзья!*\n\n*${character?.name || "Бабай"}* хочет добавить тебя в друзья в игре Бабай.\n\nОткрой раздел Друзья, чтобы принять или отклонить заявку!`;
+          await fetch(`${SUPABASE_URL}/functions/v1/send-telegram-notification`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+            body: JSON.stringify({ telegram_id: foundUser.telegram_id, caption }),
+          });
+        } catch (e) { console.error("Notify error:", e); }
+      }
+    } catch (e) {
+      console.error("Send request error:", e);
     }
+    setRequestSending(false);
     setNewFriendInput("");
     setSearchStatus("idle");
     setFoundUser(null);
+  };
+
+  const handleAcceptRequest = async (req: typeof incomingRequests[0]) => {
+    if (!profile?.telegram_id || !character) return;
+    // Get the requester's character name
+    const { data: reqStats } = await supabase.from("player_stats").select("character_name").eq("telegram_id", req.from_telegram_id).single();
+    const theirName = reqStats?.character_name || req.from_character_name || req.first_name || "Бабай";
+    const myName = character.name;
+
+    // Create mutual friend entries
+    await Promise.all([
+      supabase.from("friends").upsert({ telegram_id: profile.telegram_id, friend_name: theirName, friend_telegram_id: req.from_telegram_id }, { onConflict: "telegram_id,friend_name" }),
+      supabase.from("friends").upsert({ telegram_id: req.from_telegram_id, friend_name: myName, friend_telegram_id: profile.telegram_id }, { onConflict: "telegram_id,friend_name" }),
+    ]);
+
+    // Update request status
+    await supabase.from("friend_requests").update({ status: "accepted" }).eq("id", req.id);
+
+    // Update local store
+    addFriend(theirName);
+    setIncomingRequests(prev => prev.filter(r => r.id !== req.id));
+
+    // Notify the requester
+    try {
+      const caption = `✅ *Заявка принята!*\n\n*${myName}* принял(а) вашу заявку в друзья!`;
+      await fetch(`${SUPABASE_URL}/functions/v1/send-telegram-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ telegram_id: req.from_telegram_id, caption }),
+      });
+    } catch (e) { console.error("Notify error:", e); }
+
+    notifyFriendAdded(profile.telegram_id, req.from_telegram_id);
+  };
+
+  const handleDeclineRequest = async (req: typeof incomingRequests[0]) => {
+    await supabase.from("friend_requests").update({ status: "declined" }).eq("id", req.id);
+    setIncomingRequests(prev => prev.filter(r => r.id !== req.id));
   };
 
   const handleCopyInvite = () => {
