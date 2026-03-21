@@ -594,7 +594,46 @@ export default function Friends() {
           </AnimatePresence>
         </section>
 
-        {/* Friends List */}
+        {/* Incoming Friend Requests */}
+        {incomingRequests.length > 0 && (
+          <section className="bg-neutral-900/80 backdrop-blur-md p-4 rounded-2xl border border-yellow-900/40 space-y-3">
+            <h2 className="text-lg font-bold flex items-center gap-2 text-yellow-400">
+              <UserPlus size={18} /> Заявки в друзья
+              <span className="bg-yellow-900/50 text-yellow-300 text-xs px-2 py-0.5 rounded-full font-black">{incomingRequests.length}</span>
+            </h2>
+            <div className="space-y-2">
+              {incomingRequests.map(req => (
+                <div key={req.id} className="flex items-center gap-3 bg-neutral-950/80 border border-neutral-800 rounded-xl p-3">
+                  {req.avatar_url ? (
+                    <img src={req.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-neutral-700 shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-lg shrink-0">👻</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm truncate">{req.from_character_name || req.first_name || "Бабай"}</p>
+                    {req.username && <p className="text-neutral-500 text-xs">@{req.username}</p>}
+                    <p className="text-neutral-600 text-[10px]">{new Date(req.created_at).toLocaleDateString("ru-RU")}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleAcceptRequest(req)}
+                      className="px-3 py-2 bg-green-800/60 hover:bg-green-700/80 border border-green-700/50 text-green-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle size={14} /> Принять
+                    </button>
+                    <button
+                      onClick={() => handleDeclineRequest(req)}
+                      className="px-3 py-2 bg-red-900/40 hover:bg-red-800/60 border border-red-800/40 text-red-400 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                    >
+                      <X size={14} /> Отклонить
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-lg font-bold text-white">Список друзей ({friends.length})</h2>
