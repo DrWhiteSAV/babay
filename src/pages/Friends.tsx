@@ -40,6 +40,12 @@ export default function Friends() {
   const [friendSearch, setFriendSearch] = useState("");
   const [showSocialPopup, setShowSocialPopup] = useState(false);
 
+  // Friend requests state
+  const [incomingRequests, setIncomingRequests] = useState<Array<{id: string; from_telegram_id: number; from_character_name: string | null; created_at: string; avatar_url?: string; username?: string; first_name?: string}>>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<Array<{id: string; to_telegram_id: number; status: string; created_at: string}>>([]);
+  const [requestSending, setRequestSending] = useState(false);
+  const [showRequestsSection, setShowRequestsSection] = useState(true);
+
   // Collect all friend telegram IDs for online status polling
   const friendTelegramIds = useMemo(
     () => Object.values(friendsMeta).map(m => m.telegram_id).filter(Boolean) as number[],
