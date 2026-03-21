@@ -574,8 +574,8 @@ export default function Friends() {
                     )}
                   </div>
                 </div>
-                <button onClick={handleAddFoundFriend} className="ml-3 shrink-0 px-4 py-2 bg-green-700 hover:bg-green-600 rounded-xl text-white text-xs font-bold transition-colors flex items-center gap-1">
-                  <UserPlus size={14} /> Добавить
+                <button onClick={handleAddFoundFriend} disabled={requestSending} className="ml-3 shrink-0 px-4 py-2 bg-green-700 hover:bg-green-600 rounded-xl text-white text-xs font-bold transition-colors flex items-center gap-1 disabled:opacity-50">
+                  {requestSending ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />} {requestSending ? "..." : outgoingRequests.some(r => r.to_telegram_id === foundUser?.telegram_id) ? "Заявка отправлена" : "Отправить заявку"}
                 </button>
               </motion.div>
             )}
