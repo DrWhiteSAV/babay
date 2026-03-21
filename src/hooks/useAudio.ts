@@ -114,9 +114,9 @@ export const useAudio = (masterVolume: number, volumeClicks?: number, volumeTran
       "https://psuvnvqvspqibsezcrny.supabase.co/storage/v1/object/public/SongBabai/Zvukclick.MP3",
     ]);
     const click = new Audio(pickRandom(urls));
-    click.volume = volume / 100;
+    click.volume = (masterVolume / 100) * (clickVol / 100);
     click.play().catch(() => {});
-  }, [volume, dbAudio]);
+  }, [masterVolume, clickVol, dbAudio]);
 
   const playTransition = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
