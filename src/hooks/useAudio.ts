@@ -45,7 +45,10 @@ function getUrls(settings: Record<string, string[]> | null, key: string, fallbac
   return fallback;
 }
 
-export const useAudio = (volume: number) => {
+export const useAudio = (masterVolume: number, volumeClicks?: number, volumeTransitions?: number, volumeBgSounds?: number) => {
+  const clickVol = volumeClicks ?? masterVolume;
+  const transVol = volumeTransitions ?? masterVolume;
+  const bgSoundVol = volumeBgSounds ?? masterVolume;
   const location = useLocation();
   const specialAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastPathRef = useRef(location.pathname);
@@ -111,9 +114,9 @@ export const useAudio = (volume: number) => {
       "https://psuvnvqvspqibsezcrny.supabase.co/storage/v1/object/public/SongBabai/Zvukclick.MP3",
     ]);
     const click = new Audio(pickRandom(urls));
-    click.volume = volume / 100;
+    click.volume = (masterVolume / 100) * (clickVol / 100);
     click.play().catch(() => {});
-  }, [volume, dbAudio]);
+  }, [masterVolume, clickVol, dbAudio]);
 
   const playTransition = useCallback(() => {
     const hasInteracted = (navigator as any).userActivation ? (navigator as any).userActivation.hasBeenActive : true;
@@ -122,9 +125,9 @@ export const useAudio = (volume: number) => {
       "https://psuvnvqvspqibsezcrny.supabase.co/storage/v1/object/public/SongBabai/Zvukswoosh.MP3",
     ]);
     const whoosh = new Audio(pickRandom(urls));
-    whoosh.volume = volume / 100;
+    whoosh.volume = (masterVolume / 100) * (transVol / 100);
     whoosh.play().catch(() => {});
-  }, [volume, dbAudio]);
+  }, [masterVolume, transVol, dbAudio]);
 
   const playSound = useCallback(
     (type: "scream" | "cat" | "fear") => {
@@ -142,11 +145,11 @@ export const useAudio = (volume: number) => {
 
       const urls = getUrls(dbAudio, type, fallbackMap[type]);
       const audio = new Audio(pickRandom(urls));
-      audio.volume = (volume / 100) * 0.5;
+      audio.volume = (masterVolume / 100) * (bgSoundVol / 100) * 0.5;
       specialAudioRef.current = audio;
       audio.play().catch(() => {});
     },
-    [volume, dbAudio],
+    [masterVolume, bgSoundVol, dbAudio],
   );
 
   // Expose loaded DB audio for bgMusic usage in App.tsx

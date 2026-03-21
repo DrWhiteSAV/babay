@@ -77,7 +77,7 @@ function AppContent() {
   const { entryMode, isLoading, profile } = useTelegram();
   const [hasSeenInitialCutscene, setHasSeenInitialCutscene] = useState(false);
   const { updateEnergy, settings, globalBackgroundUrl, setGlobalBackgroundUrl, character, pageBackgrounds, setPageBackgrounds, setVideoCutscenes } = usePlayerStore();
-  const { playClick, getMenuMusicUrls, getBgMusicUrls } = useAudio(settings.musicVolume);
+  const { playClick, getMenuMusicUrls, getBgMusicUrls } = useAudio(settings.musicVolume, settings.volumeClicks, settings.volumeTransitions, settings.volumeBgSounds);
   const location = useLocation();
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
@@ -151,8 +151,9 @@ function AppContent() {
       }
     }
 
-    bgMusicRef.current.volume = (settings.musicVolume / 100) * 0.2;
-  }, [location.pathname, settings.musicVolume, getMenuMusicUrls, getBgMusicUrls]);
+    const bgMusicVol = (settings.volumeBgMusic ?? 50) / 100;
+    bgMusicRef.current.volume = (settings.musicVolume / 100) * bgMusicVol * 0.2;
+  }, [location.pathname, settings.musicVolume, settings.volumeBgMusic, getMenuMusicUrls, getBgMusicUrls]);
 
   useEffect(() => {
     const handleInteraction = () => {

@@ -45,7 +45,7 @@ function useHomeBg() {
 }
 
 export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) => {
-  const { videoCutscenes } = usePlayerStore();
+  const { videoCutscenes, settings } = usePlayerStore();
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [needsInteraction, setNeedsInteraction] = useState(false);
@@ -101,6 +101,9 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
   const tryAutoPlay = () => {
     if (!videoRef.current || hasTriedPlayRef.current) return;
     hasTriedPlayRef.current = true;
+    // Apply cutscene volume
+    const cutsceneVol = (settings.musicVolume / 100) * ((settings.volumeCutscene ?? 50) / 100);
+    videoRef.current.volume = Math.min(1, cutsceneVol);
     const playPromise = videoRef.current.play();
     if (playPromise !== undefined) {
       playPromise
@@ -124,6 +127,8 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
     setNeedsInteraction(false);
     hasTriedPlayRef.current = false;
     if (videoRef.current) {
+      const cutsceneVol = (settings.musicVolume / 100) * ((settings.volumeCutscene ?? 50) / 100);
+      videoRef.current.volume = Math.min(1, cutsceneVol);
       videoRef.current.play().catch(() => {});
     }
   };

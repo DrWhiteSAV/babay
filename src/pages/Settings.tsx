@@ -482,7 +482,7 @@ export default function Settings() {
         {/* Music Volume */}
         <section>
           <h2 className="text-lg font-bold text-white mb-4 uppercase tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-2">
-            <Volume2 size={18} /> Громкость музыки
+            <Volume2 size={18} /> Громкость всех звуков
           </h2>
           <div className="bg-neutral-900/50 backdrop-blur-sm border border-neutral-800 rounded-2xl p-6">
             <input

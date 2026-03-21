@@ -316,6 +316,33 @@ export type Database = {
         }
         Relationships: []
       }
+      friend_requests: {
+        Row: {
+          created_at: string
+          from_character_name: string | null
+          from_telegram_id: number
+          id: string
+          status: string
+          to_telegram_id: number
+        }
+        Insert: {
+          created_at?: string
+          from_character_name?: string | null
+          from_telegram_id: number
+          id?: string
+          status?: string
+          to_telegram_id: number
+        }
+        Update: {
+          created_at?: string
+          from_character_name?: string | null
+          from_telegram_id?: number
+          id?: string
+          status?: string
+          to_telegram_id?: number
+        }
+        Relationships: []
+      }
       friends: {
         Row: {
           added_at: string

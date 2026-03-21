@@ -725,13 +725,13 @@ export default function Game() {
         });
       } else addFear(fearReward);
       setScore(s => s + 1);
-      playSuccess(settings.musicVolume);
+      playSuccess((settings.musicVolume / 100) * ((settings.volumeAnswerSfx ?? 50) / 100) * 100);
       setShowSuccessAvatar(true);
       await new Promise(r => setTimeout(r, 1000));
       setShowSuccessAvatar(false);
     } else {
       setShowScreamer(true);
-      playScreamer(settings.musicVolume);
+      playScreamer((settings.musicVolume / 100) * ((settings.volumeAnswerSfx ?? 50) / 100) * 100);
       await new Promise(r => setTimeout(r, 800));
       setShowScreamer(false);
     }
@@ -774,7 +774,7 @@ export default function Game() {
         return next;
       });
       else addWatermelons(reward);
-      playSuccess(settings.musicVolume);
+      playSuccess((settings.musicVolume / 100) * ((settings.volumeAnswerSfx ?? 50) / 100) * 100);
     }
   };
 
