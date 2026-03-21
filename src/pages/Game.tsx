@@ -774,7 +774,7 @@ export default function Game() {
         return next;
       });
       else addWatermelons(reward);
-      playSuccess(settings.musicVolume);
+      playSuccess((settings.musicVolume / 100) * ((settings.volumeAnswerSfx ?? 50) / 100) * 100);
     }
   };
 

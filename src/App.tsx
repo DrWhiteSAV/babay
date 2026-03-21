@@ -151,7 +151,8 @@ function AppContent() {
       }
     }
 
-    bgMusicRef.current.volume = (settings.musicVolume / 100) * 0.2;
+    const bgMusicVol = (settings.volumeBgMusic ?? 50) / 100;
+    bgMusicRef.current.volume = (settings.musicVolume / 100) * bgMusicVol * 0.2;
   }, [location.pathname, settings.musicVolume, getMenuMusicUrls, getBgMusicUrls]);
 
   useEffect(() => {

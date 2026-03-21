@@ -145,11 +145,11 @@ export const useAudio = (masterVolume: number, volumeClicks?: number, volumeTran
 
       const urls = getUrls(dbAudio, type, fallbackMap[type]);
       const audio = new Audio(pickRandom(urls));
-      audio.volume = (volume / 100) * 0.5;
+      audio.volume = (masterVolume / 100) * (bgSoundVol / 100) * 0.5;
       specialAudioRef.current = audio;
       audio.play().catch(() => {});
     },
-    [volume, dbAudio],
+    [masterVolume, bgSoundVol, dbAudio],
   );
 
   // Expose loaded DB audio for bgMusic usage in App.tsx
