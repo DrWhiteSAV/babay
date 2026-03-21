@@ -45,7 +45,7 @@ function useHomeBg() {
 }
 
 export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) => {
-  const { videoCutscenes } = usePlayerStore();
+  const { videoCutscenes, settings } = usePlayerStore();
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [needsInteraction, setNeedsInteraction] = useState(false);
