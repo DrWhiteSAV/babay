@@ -101,6 +101,9 @@ export const CutscenePlayer: React.FC<CutscenePlayerProps> = ({ onComplete }) =>
   const tryAutoPlay = () => {
     if (!videoRef.current || hasTriedPlayRef.current) return;
     hasTriedPlayRef.current = true;
+    // Apply cutscene volume
+    const cutsceneVol = (settings.musicVolume / 100) * ((settings.volumeCutscene ?? 50) / 100);
+    videoRef.current.volume = Math.min(1, cutsceneVol);
     const playPromise = videoRef.current.play();
     if (playPromise !== undefined) {
       playPromise
